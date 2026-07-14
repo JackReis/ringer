@@ -28,7 +28,7 @@ class FleetWaveCLITests(unittest.TestCase):
 import json, os, sys
 with open(os.environ['CALL_LOG'], 'a') as f: f.write(json.dumps(['bd', *sys.argv[1:]])+'\\n')
 if os.environ.get('BD_FAIL') == '1': raise SystemExit(9)
-print(json.dumps({'id': sys.argv[2] if len(sys.argv)>2 else 'x', 'status': 'in_progress', 'assignee': 'fleet'}))
+print(json.dumps({'id': sys.argv[2] if len(sys.argv)>2 else 'x', 'status': os.environ.get('BD_STATUS', 'in_progress'), 'assignee': os.environ.get('BD_ASSIGNEE', 'fleet')}))
 """)
         self.ringer = executable(self.root / "ringer", """
 import json, os, sys
@@ -60,7 +60,7 @@ with open(os.environ['CALL_LOG'], 'a') as f: f.write(json.dumps(['paperclip', *s
             "supersedes": None, "ringer_manifest": str(self.ringer_manifest),
             "beads": {"claim_id": "bead-new", "existing_ids": ["bead-old"]},
             "paperclip": {"issue_id": "pc-new", "existing_ids": ["pc-old"]},
-            "tasks": [{"key": "alpha", "evidence": {"strength": "strong", "kind": "objective"}}]
+            "tasks": [{"key": "alpha", "work_type": "other", "evidence": {"strength": "strong", "kind": "objective"}}]
         }
         data.update(updates)
         self.manifest.write_text(json.dumps(data))
@@ -84,6 +84,8 @@ with open(os.environ['CALL_LOG'], 'a') as f: f.write(json.dumps(['paperclip', *s
         calls = self.calls()
         self.assertLess(calls.index(["bd", "update", "bead-new", "--claim", "--json"]), calls.index(["bd", "show", "bead-new", "--json"]))
         self.assertIn(["bd", "show", "bead-old", "--json"], calls)
+        self.assertIn(["paperclip", "show", "pc-new"], calls)
+        self.assertIn(["paperclip", "show", "pc-old"], calls)
         lint = ["ringer", "lint", str(self.ringer_manifest)]
         dry = ["ringer", "run", str(self.ringer_manifest), "--dry-run"]
         self.assertLess(calls.index(lint), calls.index(dry))
@@ -96,9 +98,19 @@ with open(os.environ['CALL_LOG'], 'a') as f: f.write(json.dumps(['paperclip', *s
         self.write_manifest(manifest_version=2, supersedes=None)
         result = self.run_cli("prepare")
         self.assertNotEqual(result.returncode, 0); self.assertFalse(self.log.exists())
-        self.write_manifest(tasks=[{"key": "alpha", "evidence": {"strength": "weak", "kind": "objective"}}])
+        self.write_manifest(tasks=[{"key": "alpha", "work_type": "other", "evidence": {"strength": "weak", "kind": "objective"}}])
         result = self.run_cli("prepare")
         self.assertNotEqual(result.returncode, 0); self.assertFalse(self.log.exists())
+
+    def test_prepare_rejects_unconfirmed_claim_and_weak_code_check(self):
+        result = self.run_cli("prepare", env={"BD_STATUS": "open"})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("ringer", [c[0] for c in self.calls()])
+        self.log.unlink()
+        self.write_manifest(tasks=[{"key": "alpha", "work_type": "code", "evidence": {"strength": "strong", "kind": "objective"}}])
+        result = self.run_cli("prepare")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.log.exists())
 
     def test_prepare_degraded_mode_is_explicit_and_never_dispatches(self):
         result = self.run_cli("prepare", ["--degraded-no-dispatch"], {"BD_FAIL": "1"})
@@ -132,7 +144,7 @@ with open(os.environ['CALL_LOG'], 'a') as f: f.write(json.dumps(['paperclip', *s
         self.assertNotIn("paperclip", [c[0] for c in self.calls()])
 
     def test_judgmental_task_requires_fresh_hash_bound_judge_receipt(self):
-        self.write_manifest(tasks=[{"key": "alpha", "evidence": {"strength": "strong", "kind": "judgmental"}}])
+        self.write_manifest(tasks=[{"key": "alpha", "work_type": "other", "evidence": {"strength": "strong", "kind": "judgmental"}}])
         self.prepare_ok()
         result = self.run_cli("post-run")
         self.assertNotEqual(result.returncode, 0)

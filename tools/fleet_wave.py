@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -55,6 +56,42 @@ def resolve(base: Path, value: str) -> Path:
     return path if path.is_absolute() else base / path
 
 
+WORK_TYPES = {"code", "deployment", "config", "factual-research", "other"}
+STRONG_CHECK_PATTERNS = {
+    "code": r"(?:^|&&|\|\||;)\s*(?:(?:python\d*(?:\.\d+)?\s+-m\s+)(?:pytest|unittest|compileall)|pytest\b|npm\s+(?:test|run\s+test)\b|cargo\s+test\b|go\s+test\b)",
+    "deployment": r"(?:^|&&|\|\||;)\s*(?:curl\b|systemctl\b|launchctl\b|kubectl\b|docker\b)",
+    "config": r"(?:^|&&|\|\||;)\s*(?:python\d*(?:\.\d+)?\b[^;&|]*(?:json\.load|tomllib|configparser)|plutil\b|jq\b)",
+}
+
+
+def validate_version_chain(manifest: dict[str, Any], path: Path) -> None:
+    version = manifest["manifest_version"]
+    match = re.fullmatch(r"manifest-v(\d+)\.json", path.name)
+    if not match or int(match.group(1)) != version:
+        raise ProtocolError(f"manifest filename must be manifest-v{version}.json")
+    supersedes = manifest.get("supersedes")
+    if version == 1:
+        if supersedes is not None:
+            raise ProtocolError("manifest-v1.json must not supersede another manifest")
+        return
+    if not isinstance(supersedes, str) or not supersedes:
+        raise ProtocolError("manifest-vN requires supersedes when N > 1")
+    prior_path = resolve(path.parent, supersedes).resolve()
+    expected = path.with_name(f"manifest-v{version - 1}.json").resolve()
+    if prior_path != expected or not prior_path.is_file():
+        raise ProtocolError(f"supersedes must reference existing manifest-v{version - 1}.json")
+    prior = load(prior_path)
+    if prior.get("wave_id") != manifest["wave_id"] or prior.get("manifest_version") != version - 1:
+        raise ProtocolError("superseded manifest is not the preceding version of this wave")
+
+
+def check_is_strong(work_type: str, check: str, evidence_kind: str) -> bool:
+    if work_type == "factual-research":
+        return evidence_kind == "judgmental"
+    pattern = STRONG_CHECK_PATTERNS.get(work_type)
+    return bool(pattern and re.search(pattern, check, re.IGNORECASE))
+
+
 def validate_manifest(manifest: dict[str, Any], path: Path) -> Path:
     required = {"schema_version", "manifest_version", "wave_id", "ringer_manifest", "beads", "tasks"}
     missing = sorted(required - manifest.keys())
@@ -65,8 +102,7 @@ def validate_manifest(manifest: dict[str, Any], path: Path) -> Path:
     version = manifest["manifest_version"]
     if not isinstance(version, int) or version < 1:
         raise ProtocolError("manifest_version must be a positive integer")
-    if version > 1 and not manifest.get("supersedes"):
-        raise ProtocolError("manifest-vN requires supersedes when N > 1")
+    validate_version_chain(manifest, path)
     beads = manifest["beads"]
     if not isinstance(beads, dict) or not beads.get("claim_id"):
         raise ProtocolError("beads.claim_id is required")
@@ -90,13 +126,25 @@ def validate_manifest(manifest: dict[str, Any], path: Path) -> Path:
     ringer_keys = {t.get("key") for t in ringer.get("tasks", []) if isinstance(t, dict)}
     if keys != ringer_keys:
         raise ProtocolError("Fleet Wave task keys must exactly match Ringer task keys")
+    ringer_tasks = {t["key"]: t for t in ringer.get("tasks", []) if isinstance(t, dict) and "key" in t}
+    for task in tasks:
+        work_type = task.get("work_type")
+        if work_type not in WORK_TYPES:
+            raise ProtocolError(f"task {task['key']} has invalid or missing work_type")
+        if work_type != "other":
+            check = ringer_tasks[task["key"]].get("check")
+            if not isinstance(check, str) or not check_is_strong(work_type, check, task["evidence"]["kind"]):
+                raise ProtocolError(f"task {task['key']} has only a weak check for {work_type} work")
     return ringer_path
 
 
 def ids(surface: Any) -> list[str]:
     if not isinstance(surface, dict):
         return []
-    values = [surface.get("claim_id") or surface.get("issue_id"), *surface.get("existing_ids", [])]
+    existing = surface.get("existing_ids", [])
+    if not isinstance(existing, list) or not all(isinstance(v, str) and v for v in existing):
+        raise ProtocolError("existing_ids must be an array of non-empty strings")
+    values = [surface.get("claim_id") or surface.get("issue_id"), *existing]
     return list(dict.fromkeys(str(v) for v in values if v))
 
 
@@ -114,10 +162,16 @@ def prepare(args: argparse.Namespace) -> None:
         bd(args, "update", claim, "--claim")
         readback = bd(args, "show", claim)
         claimed = json.loads(readback.stdout)
-        if claimed.get("status") not in {"in_progress", "claimed", "open"}:
+        if claimed.get("status") not in {"in_progress", "claimed"} or not claimed.get("assignee"):
             raise ProtocolError("Beads claim readback did not confirm the claim")
         for bead_id in ids(manifest["beads"])[1:]:
             bd(args, "show", bead_id)
+        paperclip = manifest.get("paperclip")
+        if paperclip:
+            if not args.paperclip_bin:
+                raise ProtocolError("paperclip manifest requires --paperclip-bin for reconciliation")
+            for issue_id in ids(paperclip):
+                run([args.paperclip_bin, "show", issue_id])
     except (ProtocolError, json.JSONDecodeError):
         if not args.degraded_no_dispatch:
             raise
@@ -184,7 +238,12 @@ def post_run(args: argparse.Namespace) -> None:
             raise ProtocolError("judge receipt is not hash-bound to this wave")
         if str(judge.get("verdict", "")).lower() not in {"pass", "passed"}:
             raise ProtocolError("judge verdict is not pass")
-        if str(judge.get("judged_at", "")) < str(prepared.get("prepared_at", "")):
+        try:
+            judged_at = datetime.fromisoformat(str(judge["judged_at"]).replace("Z", "+00:00"))
+            prepared_at = datetime.fromisoformat(str(prepared["prepared_at"]).replace("Z", "+00:00"))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ProtocolError("judge receipt has an invalid timestamp") from exc
+        if judged_at.tzinfo is None or prepared_at.tzinfo is None or judged_at <= prepared_at:
             raise ProtocolError("judge receipt is stale")
         judge_hash = digest(judge_path)
     receipt = {
