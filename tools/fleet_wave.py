@@ -2,7 +2,7 @@
 """Fail-closed Fleet Wave v1 controller (stdlib only)."""
 from __future__ import annotations
 import argparse, hashlib, hmac, json, os, re, shutil, socket, subprocess, sys, tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 class ProtocolError(RuntimeError): pass
@@ -323,6 +323,7 @@ def recursively_contains(value,target):
  if isinstance(value,list):return any(recursively_contains(x,target) for x in value)
  return False
 def accept(a):
+ controller_now=datetime.now(timezone.utc)
  p,m,rp=context(a);prep=load(a.prepared_receipt);validate_prepared_receipt(prep,m);validate_integrity(prep);binding(p,m,rp,prep,'prepared');ex=load(a.execute_receipt);validate_execute_receipt(ex);validate_integrity(ex);validate_transitions(ex['transitions'],['INTAKE','LEDGERED','CLAIMED',f"MANIFEST-v{m['manifest_version']}",'LINTED','DRY-RUN','PAPERCLIP PREPARED RECEIPT','RINGER RUN'],m,ex['claim_id'],ex['beads_issue_version']);binding(p,m,rp,ex,'executed')
  if ex.get('prepared_receipt_sha256')!=digest(a.prepared_receipt):raise ProtocolError('execute/prepared binding mismatch')
  sp=Path(str(ex.get('run_state_path',''))).resolve()
@@ -354,14 +355,17 @@ def accept(a):
     clean_replay[k]['negative_controls'].append({'name':control['name'],'setup':control['setup'],'observed_exit_status':nr.returncode,'raw_output_sha256':hashlib.sha256((nr.stdout+nr.stderr).encode()).hexdigest()})
  judge_hash=None;judgment=[x['key'] for x in m['tasks'] if x['evidence']['kind']=='judgmental']
  if judgment:
-  if not a.judge_receipt:raise ProtocolError('fresh judge attestation required')
-  j=load(a.judge_receipt);required={'judge_id','session_id','model','harness_attestation','new_session','resumed','role_history','judged_at','evidence_fetched_at','criteria','rationale','task_keys','independent','verdict','wave_id','manifest_sha256','execute_receipt_sha256','run_state_sha256'};exact(j,required,'judge attestation')
+  if not a.judge_receipt or not nonempty(a.judge_nonce):raise ProtocolError('fresh judge attestation and caller nonce required')
+  j=load(a.judge_receipt);required={'judge_id','session_id','model','harness_attestation','new_session','resumed','role_history','attempt_id','nonce','session_created_at','evidence_fetched_at','issued_at','judged_at','expires_at','criteria','rationale','task_keys','independent','verdict','wave_id','manifest_sha256','execute_receipt_sha256','run_state_sha256'};exact(j,required,'judge attestation')
   h=j['harness_attestation'];forbidden={'author','worker','executor','checker','replay_checker','deliberator'};secret=os.environ.get('FLEET_JUDGE_ATTESTATION_SECRET')
   unsigned={**j,'harness_attestation':{k:v for k,v in h.items() if k!='signature'}} if isinstance(h,dict) else {}
   harness_ok=isinstance(h,dict) and set(h)=={'attestation_id','provider','session_id','judge_id','issuer','signature'} and all(nonempty(h[x]) for x in h) and nonempty(secret) and hmac.compare_digest(h['signature'],hmac.new(secret.encode(),json.dumps(unsigned,sort_keys=True,separators=(',',':')).encode(),hashlib.sha256).hexdigest()) and h['session_id'].strip().casefold()==j['session_id'].strip().casefold() and h['judge_id'].strip().casefold()==j['judge_id'].strip().casefold()
   roles={str(x).strip().casefold() for x in j['role_history']} if isinstance(j['role_history'],list) else forbidden
   prior_principals={ex['actor']['identity'].strip().casefold(),*[x['checker']['principal'].strip().casefold() for x in replay.values()]};prior_sessions={str(ex['actor']['session_id']).strip().casefold(),*[x['checker']['session_id'].strip().casefold() for x in replay.values()]}
-  if not nonempty(j['judge_id']) or not nonempty(j['session_id']) or j['judge_id'].strip().casefold() in prior_principals or j['session_id'].strip().casefold() in prior_sessions or not nonempty(j['model']) or not harness_ok or j['new_session'] is not True or j['resumed'] is not False or forbidden.intersection(roles) or not strings(j['criteria'],True) or not nonempty(j['rationale']) or j['task_keys']!=judgment or j['independent'] is not True or j['verdict']!='PASS' or j['wave_id']!=m['wave_id'] or j['manifest_sha256']!=digest(p) or j['execute_receipt_sha256']!=digest(a.execute_receipt) or j['run_state_sha256']!=digest(sp) or dt(j['evidence_fetched_at'])<=dt(ex['executed_at']) or dt(j['judged_at'])<dt(j['evidence_fetched_at']):raise ProtocolError('invalid/stale/conflicted judge attestation')
+  executed_at=dt(ex['executed_at']);session_created_at=dt(j['session_created_at']);evidence_fetched_at=dt(j['evidence_fetched_at']);issued_at=dt(j['issued_at']);judged_at=dt(j['judged_at']);expires_at=dt(j['expires_at'])
+  nonce_ok=nonempty(j['nonce']) and hmac.compare_digest(j['nonce'].encode(),a.judge_nonce.encode())
+  fresh=executed_at<=session_created_at<=evidence_fetched_at<=issued_at<=judged_at<expires_at and judged_at<=controller_now+timedelta(seconds=30) and controller_now-judged_at<=timedelta(minutes=5) and expires_at>controller_now and expires_at-issued_at<=timedelta(minutes=10)
+  if not nonempty(j['judge_id']) or not nonempty(j['session_id']) or j['judge_id'].strip().casefold() in prior_principals or j['session_id'].strip().casefold() in prior_sessions or not nonempty(j['model']) or not harness_ok or j['new_session'] is not True or j['resumed'] is not False or forbidden.intersection(roles) or not strings(j['criteria'],True) or not nonempty(j['rationale']) or j['task_keys']!=judgment or j['independent'] is not True or j['verdict']!='PASS' or j['wave_id']!=m['wave_id'] or j['attempt_id']!=m['attempt_id'] or j['manifest_sha256']!=digest(p) or j['execute_receipt_sha256']!=digest(a.execute_receipt) or j['run_state_sha256']!=digest(sp) or not nonce_ok or not fresh:raise ProtocolError('invalid/stale/conflicted judge attestation')
   judge_hash=digest(a.judge_receipt)
  evidence_dir=Path(a.receipt).parent/'evidence';observed=now();evidence_entries=[];e3_digests={}
  for key in keys:
@@ -423,7 +427,7 @@ def parser():
  c=argparse.ArgumentParser(add_help=False)
  for x in ('manifest',):c.add_argument(x)
  for x in ('--bd-bin','--ringer-bin','--beads-host','--beads-store','--beads-claimant','--receipt'):c.add_argument(x,required=True)
- c.add_argument('--paperclip-bin');c.add_argument('--ringside-bin');c.add_argument('--sandbox-bin',default='/usr/bin/sandbox-exec' if sys.platform=='darwin' else None);root=argparse.ArgumentParser(description=__doc__);subs=root.add_subparsers(dest='command',required=True);subs.add_parser('prepare',parents=[c]);e=subs.add_parser('execute',parents=[c]);e.add_argument('--prepared-receipt',required=True);a=subs.add_parser('accept',parents=[c]);a.add_argument('--prepared-receipt',required=True);a.add_argument('--execute-receipt',required=True);a.add_argument('--judge-receipt');b=subs.add_parser('block',parents=[c]);b.add_argument('--predecessor-receipt',required=True);b.add_argument('--failed-stage',required=True,choices=['INTAKE','LEDGERED','CLAIMED','MANIFEST-vN','LINTED','DRY-RUN','PAPERCLIP PREPARED RECEIPT','RINGER RUN','INDEPENDENT CHECK REPLAY','FRESH JUDGE']);b.add_argument('--reason-code',required=True);r=subs.add_parser('replay-one');r.add_argument('--snapshot',required=True);r.add_argument('--inventory',required=True);r.add_argument('--tree-digest',required=True);r.add_argument('--check',required=True);r.add_argument('--output',required=True);r.add_argument('--sandbox-bin',default='/usr/bin/sandbox-exec' if sys.platform=='darwin' else None);return root
+ c.add_argument('--paperclip-bin');c.add_argument('--ringside-bin');c.add_argument('--sandbox-bin',default='/usr/bin/sandbox-exec' if sys.platform=='darwin' else None);root=argparse.ArgumentParser(description=__doc__);subs=root.add_subparsers(dest='command',required=True);subs.add_parser('prepare',parents=[c]);e=subs.add_parser('execute',parents=[c]);e.add_argument('--prepared-receipt',required=True);a=subs.add_parser('accept',parents=[c]);a.add_argument('--prepared-receipt',required=True);a.add_argument('--execute-receipt',required=True);a.add_argument('--judge-receipt');a.add_argument('--judge-nonce');b=subs.add_parser('block',parents=[c]);b.add_argument('--predecessor-receipt',required=True);b.add_argument('--failed-stage',required=True,choices=['INTAKE','LEDGERED','CLAIMED','MANIFEST-vN','LINTED','DRY-RUN','PAPERCLIP PREPARED RECEIPT','RINGER RUN','INDEPENDENT CHECK REPLAY','FRESH JUDGE']);b.add_argument('--reason-code',required=True);r=subs.add_parser('replay-one');r.add_argument('--snapshot',required=True);r.add_argument('--inventory',required=True);r.add_argument('--tree-digest',required=True);r.add_argument('--check',required=True);r.add_argument('--output',required=True);r.add_argument('--sandbox-bin',default='/usr/bin/sandbox-exec' if sys.platform=='darwin' else None);return root
 def main(argv=None):
  a=parser().parse_args(argv)
  try:{'prepare':prepare,'execute':execute,'accept':accept,'block':block,'replay-one':replay_child}[a.command](a)
