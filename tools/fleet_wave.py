@@ -39,6 +39,7 @@ def exact(v,keys,label):
 def nonempty(v):return isinstance(v,str) and bool(v.strip())
 def sha(v):return isinstance(v,str) and re.fullmatch('[0-9a-f]{64}',v) is not None
 def json_digest(v):return hashlib.sha256(json.dumps(v,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+def receipt_digest(v):return hashlib.sha256((json.dumps(v,indent=2,sort_keys=True)+'\n').encode()).hexdigest()
 def authority(m):
  b=m['beads']; core={'issue_id':b['issue_id'],'authority_host':b['host'],'store_locator':b['store'],'claimant':b['claimant']};return {**core,'digest':json_digest(core)}
 def enrich(rec,m,receipt_type,from_state,to_state,predecessor=None,result='PASS',reason=None,evidence=None,stage=None):
@@ -74,20 +75,41 @@ def claim(a,m):
  return {**evidence,'evidence_digest':json_digest(evidence),'lease_supported':False,'atomic_operation':'bd update ISSUE --claim --actor CLAIMANT --json'}
 def show_disposition(a,m,status):
  return validate_beads_item(parse_item(bd(a,'show',m['beads']['issue_id']).stdout),m,status,active=False)
-def transition(m,name,previous=None,result='PASS',evidence=None,reason=None):
- t={'receipt_id':f"{m['attempt_id']}:{name}",'transition':name,'result':result,'reason_code':reason,'predecessor':None if previous is None else {'receipt_id':previous['receipt_id'],'digest':previous['integrity']['digest']},'evidence':evidence or []}
- t['integrity']={'digest':json_digest(t)};return t
-def transition_chain(m,names,evidence=None):
- out=[]
- for name in names:out.append(transition(m,name,out[-1] if out else None,evidence=(evidence or {}).get(name)))
+def actor(m):
+ return {'identity':os.environ.get('USER','controller'),'role':'controller','service':'fleet-wave','host':socket.gethostname(),'execution_id':m['attempt_id'],'session_id':os.environ.get('FLEET_SESSION_ID'),'model':os.environ.get('FLEET_MODEL'),'attestation':{'type':'attempt-bound-controller','cryptographic':False}}
+def transition(m,from_state,to_state,previous,claim_id,beads_version,result='PASS',evidence=None,reason=None,stage=None,at=None):
+ at=at or beads_version;pred={'receipt_id':None,'digest':None} if previous is None else {'receipt_id':previous['receipt_id'],'digest':receipt_digest(previous)}
+ t={'schema_version':'fleet-wave.v1','protocol_version':'1.0.0','receipt_id':f"{m['attempt_id']}:transition:{to_state}",'receipt_type':'state-transition','authority':authority(m),'work_id':m['beads']['issue_id'],'beads_issue_version':beads_version,'claim_id':claim_id,'attempt_id':m['attempt_id'],'manifest_version':f"v{m['manifest_version']}",'manifest_digest':m['_manifest_digest'],'predecessor':pred,'actor':actor(m),'timestamps':{'started_at':at,'ended_at':at},'transition':{'from':from_state,'to':to_state},'result':result,'reason_code':reason,'evidence':evidence or [],'stage_extension':stage or {}}
+ t['integrity']={'digest':json_digest(t),'attestation_type':'sha256-non-cryptographic','attested_by':'fleet-wave-controller'};return t
+def transition_path(base,index,to_state):return Path(base).parent/'transition-receipts'/f"{index:02d}-{to_state.lower().replace(' ','-')}.json"
+def persist_transitions(base,chain):
+ for i,item in enumerate(chain,1):write_receipt(transition_path(base,i,item['transition']['to']),item)
+def transition_chain(m,states,claim_id,beads_version,evidence=None,existing=None):
+ out=list(existing or []);start=states[0]
+ for to_state in states[1:]:
+  out.append(transition(m,start,to_state,out[-1] if out else None,claim_id,beads_version,evidence=(evidence or {}).get(to_state),stage={'state':to_state}));start=to_state
  return out
-def validate_transitions(value,names):
- if not isinstance(value,list) or [x.get('transition') for x in value]!=names:raise ProtocolError('receipt transition chain is incomplete or out of order')
+def validate_transitions(value,states,m,claim_id,beads_version):
+ expected=list(zip(states,states[1:]))
+ if not isinstance(value,list) or [x.get('transition') for x in value]!=[{'from':a,'to':b} for a,b in expected]:raise ProtocolError('receipt transition chain is incomplete, illegal, or out of order')
+ if len({x.get('receipt_id') for x in value})!=len(value):raise ProtocolError('transition receipt IDs are not unique')
  prev=None
  for x in value:
-  if not isinstance(x,dict) or x.get('result')!='PASS' or x.get('integrity',{}).get('digest')!=json_digest({k:v for k,v in x.items() if k!='integrity'}):raise ProtocolError('invalid transition receipt integrity')
-  expected=None if prev is None else {'receipt_id':prev['receipt_id'],'digest':prev['integrity']['digest']}
-  if x.get('predecessor')!=expected:raise ProtocolError('broken transition predecessor chain')
+  required={'schema_version','protocol_version','receipt_id','receipt_type','authority','work_id','beads_issue_version','claim_id','attempt_id','manifest_version','manifest_digest','predecessor','actor','timestamps','transition','result','reason_code','evidence','stage_extension','integrity'}
+  if not isinstance(x,dict) or set(x)!=required or x['schema_version']!='fleet-wave.v1' or x['protocol_version']!='1.0.0' or x['receipt_type']!='state-transition' or x['result']!='PASS':raise ProtocolError('invalid complete transition receipt')
+  if x['authority']!=authority(m) or x['work_id']!=m['beads']['issue_id'] or x['attempt_id']!=m['attempt_id'] or x['manifest_version']!=f"v{m['manifest_version']}" or x['manifest_digest']!=m['_manifest_digest'] or x['claim_id']!=claim_id or x['beads_issue_version']!=beads_version:raise ProtocolError('transition receipt binding mismatch')
+  exact(x['actor'],{'identity','role','service','host','execution_id','session_id','model','attestation'},'transition actor');exact(x['timestamps'],{'started_at','ended_at'},'transition timestamps')
+  if not all(nonempty(x['actor'][k]) for k in ('identity','role','service','host','execution_id')) or not isinstance(x['actor']['attestation'],dict) or not isinstance(x['stage_extension'],dict) or not isinstance(x['evidence'],list):raise ProtocolError('invalid transition actor, evidence, or extension')
+  for ev in x['evidence']:
+   exact(ev,{'class','uri','digest','size_bytes','provenance','observed_at','freshness'},'typed evidence')
+   if ev['class'] not in {'E0','E1','E2','E3','E4','E5'} or not nonempty(ev['uri']) or not sha(ev['digest']) or type(ev['size_bytes']) is not int or ev['size_bytes']<0 or not isinstance(ev['provenance'],dict):raise ProtocolError('invalid typed evidence')
+   dt(ev['observed_at'])
+   if ev['uri'].startswith('file://'):
+    q=Path(ev['uri'][7:]);
+    if not q.is_file() or digest(q)!=ev['digest'] or q.stat().st_size!=ev['size_bytes']:raise ProtocolError('evidence artifact binding mismatch')
+  validate_integrity(x);dt(x['timestamps']['started_at']);dt(x['timestamps']['ended_at'])
+  expected_pred={'receipt_id':None,'digest':None} if prev is None else {'receipt_id':prev['receipt_id'],'digest':receipt_digest(prev)}
+  if x.get('predecessor')!=expected_pred:raise ProtocolError('broken transition predecessor chain')
   prev=x
 def write_projection_receipt(base,suffix,value):write_receipt(str(Path(base).with_suffix(Path(base).suffix+suffix)),value)
 def degraded(base,m,stage,error,predecessor=None):
@@ -155,6 +177,7 @@ def validate_manifest(m,path):
 def context(a):
  p=Path(a.manifest).resolve();m=load(p);rp=validate_manifest(m,p);b=m['beads']
  if a.beads_host!=socket.gethostname() or (a.beads_host,a.beads_store,a.beads_claimant)!=(b['host'],b['store'],b['claimant']):raise ProtocolError('Beads authority does not match actual host/manifest store/claimant')
+ m['_manifest_digest']=digest(p)
  return p,m,rp
 def validate_prepared_receipt(r,m):
  required={'schema_version','event','prepared_at','wave_id','manifest_sha256','ringer_manifest_sha256','beads_authority','dispatch_authorized','claim_proof','transitions','protocol_version','receipt_id','receipt_type','authority','work_id','beads_issue_version','claim_id','attempt_id','manifest_version','manifest_digest','predecessor','actor','timestamps','transition','result','reason_code','evidence','integrity','stage_extension'}
@@ -163,7 +186,7 @@ def validate_prepared_receipt(r,m):
  dt(r['prepared_at'])
  if r['beads_authority']!=m['beads']:raise ProtocolError('prepared receipt authority mismatch')
  if r['claim_id']!=r['claim_proof'].get('evidence_digest') or r['beads_issue_version']!=r['claim_proof'].get('updated_at') or r['claim_proof'].get('lease_supported') is not False:raise ProtocolError('prepared receipt claim binding mismatch')
- validate_transitions(r['transitions'],['INTAKE','LEDGERED','CLAIMED',f"MANIFEST-v{m['manifest_version']}",'LINTED','DRY-RUN','PAPERCLIP PREPARED RECEIPT'])
+ validate_transitions(r['transitions'],['INTAKE','LEDGERED','CLAIMED',f"MANIFEST-v{m['manifest_version']}",'LINTED','DRY-RUN','PAPERCLIP PREPARED RECEIPT'],m,r['claim_id'],r['beads_issue_version'])
 def validate_execute_receipt(r):
  required={'schema_version','event','executed_at','wave_id','manifest_sha256','ringer_manifest_sha256','prepared_receipt_sha256','run_state_path','run_state_sha256','replay_inputs','transitions','protocol_version','receipt_id','receipt_type','authority','work_id','beads_issue_version','claim_id','attempt_id','manifest_version','manifest_digest','predecessor','actor','timestamps','transition','result','reason_code','evidence','integrity','stage_extension'}
  exact(r,required,'execute receipt')
@@ -217,10 +240,10 @@ def prepare(a):
    paperclip_readbacks.append({'requested':x,'identifier':identifier,'canonical_id':canonical})
  run([a.ringer_bin,'lint',str(rp)]);run([a.ringer_bin,'run',str(rp),'--dry-run'])
  names=['INTAKE','LEDGERED','CLAIMED',f"MANIFEST-v{m['manifest_version']}",'LINTED','DRY-RUN','PAPERCLIP PREPARED RECEIPT']
- rec={'schema_version':'fleet-wave.v1','event':'prepared','prepared_at':now(),'wave_id':m['wave_id'],'manifest_sha256':digest(p),'ringer_manifest_sha256':digest(rp),'beads_authority':b,'dispatch_authorized':True,'claim_proof':claim_item,'transitions':transition_chain(m,names)}
+ rec={'schema_version':'fleet-wave.v1','event':'prepared','prepared_at':now(),'wave_id':m['wave_id'],'manifest_sha256':digest(p),'ringer_manifest_sha256':digest(rp),'beads_authority':b,'dispatch_authorized':True,'claim_proof':claim_item,'transitions':transition_chain(m,names,claim_item['evidence_digest'],claim_item['updated_at'])}
  enrich(rec,m,'prepared','DRY-RUN','PAPERCLIP PREPARED RECEIPT',stage={'paperclip_readbacks':paperclip_readbacks,'mirrored_beads_snapshot_digest':json_digest(b),'execution_envelope_digest':digest(rp)})
  rec['claim_id']=claim_item['evidence_digest'];rec['beads_issue_version']=claim_item['updated_at'];rec['integrity']={'digest':json_digest({k:v for k,v in rec.items() if k!='integrity'}),'attestation_type':'sha256-non-cryptographic','attested_by':'fleet-wave-controller'}
- write_receipt(a.receipt,rec)
+ persist_transitions(a.receipt,rec['transitions']);write_receipt(a.receipt,rec)
  if 'paperclip' in m:
   payload=json.dumps(rec,sort_keys=True);posted=parse_item(run([a.paperclip_bin,'comment',m['paperclip']['issue_id'],payload,'--idempotency-key',rec['receipt_id'],'--json']).stdout,'Paperclip')
   if posted.get('payload_sha256')!=hashlib.sha256(payload.encode()).hexdigest() or posted.get('issue_id') not in (paperclip_readbacks[0]['identifier'],paperclip_readbacks[0]['canonical_id']):raise ProtocolError('Paperclip prepared receipt readback mismatch')
@@ -232,10 +255,10 @@ def execute(a):
  if any(after.get(k)!=v for k,v in before.items()):raise ProtocolError('Ringer overwrote an existing run-state receipt')
  new=set(after)-set(before)
  if len(new)!=1:raise ProtocolError(f'Ringer must create exactly one new run-state receipt; found {len(new)}')
- state=next(iter(new));snapshots=snapshot_tasks(a.receipt,m,load(state));rec={'schema_version':'fleet-wave.v1','event':'executed','executed_at':now(),'wave_id':m['wave_id'],'manifest_sha256':digest(p),'ringer_manifest_sha256':digest(rp),'prepared_receipt_sha256':digest(a.prepared_receipt),'run_state_path':str(state),'run_state_sha256':digest(state),'replay_inputs':snapshots,'transitions':prep['transitions']+[transition(m,'RINGER RUN',prep['transitions'][-1])]}
+ state=next(iter(new));snapshots=snapshot_tasks(a.receipt,m,load(state));chain=transition_chain(m,['PAPERCLIP PREPARED RECEIPT','RINGER RUN'],live['evidence_digest'],live['updated_at'],existing=prep['transitions']);rec={'schema_version':'fleet-wave.v1','event':'executed','executed_at':now(),'wave_id':m['wave_id'],'manifest_sha256':digest(p),'ringer_manifest_sha256':digest(rp),'prepared_receipt_sha256':digest(a.prepared_receipt),'run_state_path':str(state),'run_state_sha256':digest(state),'replay_inputs':snapshots,'transitions':chain}
  enrich(rec,m,'executed','PAPERCLIP PREPARED RECEIPT','RINGER RUN',predecessor={'receipt_id':prep['receipt_id'],'digest':digest(a.prepared_receipt)},stage={'run_state_path':str(state),'run_state_sha256':digest(state)})
  rec['claim_id']=live['evidence_digest'];rec['beads_issue_version']=live['updated_at'];rec['integrity']={'digest':json_digest({k:v for k,v in rec.items() if k!='integrity'}),'attestation_type':'sha256-non-cryptographic','attested_by':'fleet-wave-controller'}
- write_receipt(a.receipt,rec)
+ persist_transitions(a.receipt,rec['transitions']);write_receipt(a.receipt,rec)
 def validate_state(s,keys):
  if not nonempty(s.get('run_id')):raise ProtocolError('Ringer run_id must be a nonempty scalar string')
  if s.get('state')!='finished' or s.get('finished') is not True or s.get('fail')!=0 or s.get('pass')!=len(keys):raise ProtocolError('Ringer state is not a finished all-pass run')
@@ -261,7 +284,7 @@ def recursively_contains(value,target):
  if isinstance(value,list):return any(recursively_contains(x,target) for x in value)
  return False
 def accept(a):
- p,m,rp=context(a);prep=load(a.prepared_receipt);validate_prepared_receipt(prep,m);validate_integrity(prep);binding(p,m,rp,prep,'prepared');ex=load(a.execute_receipt);validate_execute_receipt(ex);validate_integrity(ex);validate_transitions(ex['transitions'],['INTAKE','LEDGERED','CLAIMED',f"MANIFEST-v{m['manifest_version']}",'LINTED','DRY-RUN','PAPERCLIP PREPARED RECEIPT','RINGER RUN']);binding(p,m,rp,ex,'executed')
+ p,m,rp=context(a);prep=load(a.prepared_receipt);validate_prepared_receipt(prep,m);validate_integrity(prep);binding(p,m,rp,prep,'prepared');ex=load(a.execute_receipt);validate_execute_receipt(ex);validate_integrity(ex);validate_transitions(ex['transitions'],['INTAKE','LEDGERED','CLAIMED',f"MANIFEST-v{m['manifest_version']}",'LINTED','DRY-RUN','PAPERCLIP PREPARED RECEIPT','RINGER RUN'],m,ex['claim_id'],ex['beads_issue_version']);binding(p,m,rp,ex,'executed')
  if ex.get('prepared_receipt_sha256')!=digest(a.prepared_receipt):raise ProtocolError('execute/prepared binding mismatch')
  sp=Path(str(ex.get('run_state_path',''))).resolve()
  runs=(resolve(p.parent,m['ringer_state_dir']).resolve()/'runs').resolve()
@@ -281,7 +304,8 @@ def accept(a):
    inv=Path(out)/'inventory.json';inv.write_text(json.dumps(snap['inventory']));result=Path(out)/'result.json'
    run([sys.executable,str(Path(__file__).resolve()),'replay-one','--snapshot',snap['path'],'--inventory',str(inv),'--tree-digest',snap['tree_digest'],'--check',command,'--output',str(result)])
    rr=load(result)
-  replay[k]={'checker':rr['checker'],'tree_digest':rr['tree_digest']};check_execution[k]={'command':command,'exit_status':rr['exit_status'],'tool_versions':{'shell_sha256':digest('/bin/sh'),'checker_sha256':digest(__file__)},'environment_digest':json_digest({'PATH':'/usr/bin:/bin','LANG':'C','LC_ALL':'C','TZ':'UTC'}),'machine_result':'PASS','stdout_sha256':rr['stdout_sha256'],'stderr_sha256':rr['stderr_sha256']};clean_replay[k]={'isolated_copy':True,'checker':rr['checker'],'tree_digest':rr['tree_digest'],'exit_status':rr['exit_status'],'negative_controls':[]}
+  raw_digest=json_digest({'stdout_sha256':rr['stdout_sha256'],'stderr_sha256':rr['stderr_sha256']})
+  replay[k]={'checker':rr['checker'],'tree_digest':rr['tree_digest']};check_execution[k]={'command':['/bin/sh','-c',command],'exit_status':rr['exit_status'],'tool_check_versions':[{'tool':'/bin/sh','sha256':digest('/bin/sh')},{'tool':'fleet_wave.py','sha256':digest(__file__)}],'environment_digest':json_digest({'PATH':'/usr/bin:/bin','LANG':'C','LC_ALL':'C','TZ':'UTC'}),'machine_readable_result':{'verdict':'PASS','stdout_sha256':rr['stdout_sha256'],'stderr_sha256':rr['stderr_sha256']},'raw_output_digest':raw_digest};clean_replay[k]={'isolated_copy':True,'checker':rr['checker'],'tree_digest':rr['tree_digest'],'exit_status':rr['exit_status'],'negative_controls':[]}
   for control in fleet[k]['negative_controls']:
    with tempfile.TemporaryDirectory(prefix='fleet-wave-negative-') as neg:
     fixture=Path(neg)/'task';shutil.copytree(Path(snap['path']),fixture);run(['/bin/sh','-c',control['setup']],cwd=fixture)
@@ -299,8 +323,16 @@ def accept(a):
   prior_principals={ex['actor']['identity'].strip().casefold(),*[x['checker']['principal'].strip().casefold() for x in replay.values()]};prior_sessions={str(ex['actor']['session_id']).strip().casefold(),*[x['checker']['session_id'].strip().casefold() for x in replay.values()]}
   if not nonempty(j['judge_id']) or not nonempty(j['session_id']) or j['judge_id'].strip().casefold() in prior_principals or j['session_id'].strip().casefold() in prior_sessions or not nonempty(j['model']) or not harness_ok or j['new_session'] is not True or j['resumed'] is not False or forbidden.intersection(roles) or not strings(j['criteria'],True) or not nonempty(j['rationale']) or j['task_keys']!=judgment or j['independent'] is not True or j['verdict']!='PASS' or j['wave_id']!=m['wave_id'] or j['manifest_sha256']!=digest(p) or j['execute_receipt_sha256']!=digest(a.execute_receipt) or j['run_state_sha256']!=digest(sp) or dt(j['evidence_fetched_at'])<=dt(ex['executed_at']) or dt(j['judged_at'])<dt(j['evidence_fetched_at']):raise ProtocolError('invalid/stale/conflicted judge attestation')
   judge_hash=digest(a.judge_receipt)
- terminal_names=['INDEPENDENT CHECK REPLAY']+(['FRESH JUDGE'] if judgment else [])+['BEADS ACCEPTED'];chain=list(ex['transitions'])
- for name in terminal_names:chain.append(transition(m,name,chain[-1],evidence=check_execution if name=='REPLAY' else None))
+ evidence_dir=Path(a.receipt).parent/'evidence';observed=now();evidence_entries=[];e3_digests={}
+ for key in keys:
+  artifact={'schema_version':'fleet-wave-e3.v1','class':'E3','work_id':m['beads']['issue_id'],'attempt_id':m['attempt_id'],'manifest_digest':digest(p),'task_key':key,'cas_tree_digest':ex['replay_inputs'][key]['tree_digest'],'input_inventory_digest':json_digest(ex['replay_inputs'][key]['inventory']),'check_execution':check_execution[key],'observed_at':observed}
+  path=evidence_dir/f"e3-{key}.json";write_receipt(path,artifact);e3_digests[key]=digest(path);evidence_entries.append({'class':'E3','uri':path.resolve().as_uri(),'digest':digest(path),'size_bytes':path.stat().st_size,'provenance':{'producer':'fleet-wave-independent-replay','task_key':key,'cas_tree_digest':artifact['cas_tree_digest']},'observed_at':observed,'freshness':{'basis':'acceptance-run','status':'fresh'}})
+ e4={'schema_version':'fleet-wave-e4.v1','class':'E4','work_id':m['beads']['issue_id'],'attempt_id':m['attempt_id'],'manifest_digest':digest(p),'execute_receipt_digest':digest(a.execute_receipt),'run_state_digest':digest(sp),'e3_artifact_digests':e3_digests,'cas_tree_digests':{k:ex['replay_inputs'][k]['tree_digest'] for k in keys},'input_inventory_digests':{k:json_digest(ex['replay_inputs'][k]['inventory']) for k in keys},'checker_receipts':replay,'observed_at':observed}
+ e4_path=evidence_dir/'e4-independent-replay.json';write_receipt(e4_path,e4);evidence_entries.append({'class':'E4','uri':e4_path.resolve().as_uri(),'digest':digest(e4_path),'size_bytes':e4_path.stat().st_size,'provenance':{'producer':'fleet-wave-controller','e3_artifact_digests':e3_digests},'observed_at':observed,'freshness':{'basis':'acceptance-run','status':'fresh'}})
+ chain=transition_chain(m,['RINGER RUN','INDEPENDENT CHECK REPLAY'],ex['claim_id'],ex['beads_issue_version'],evidence={'INDEPENDENT CHECK REPLAY':evidence_entries},existing=ex['transitions'])
+ if judgment:chain=transition_chain(m,['INDEPENDENT CHECK REPLAY','FRESH JUDGE'],ex['claim_id'],ex['beads_issue_version'],existing=chain)
+ chain=transition_chain(m,[chain[-1]['transition']['to'],'BEADS ACCEPTED'],ex['claim_id'],ex['beads_issue_version'],existing=chain)
+ final_states=['INTAKE','LEDGERED','CLAIMED',f"MANIFEST-v{m['manifest_version']}",'LINTED','DRY-RUN','PAPERCLIP PREPARED RECEIPT','RINGER RUN','INDEPENDENT CHECK REPLAY']+(['FRESH JUDGE'] if judgment else [])+['BEADS ACCEPTED'];validate_transitions(chain,final_states,m,ex['claim_id'],ex['beads_issue_version'])
  rec={'schema_version':'fleet-wave.v1','event':'accepted','accepted_at':now(),'wave_id':m['wave_id'],'manifest_sha256':digest(p),'ringer_manifest_sha256':digest(rp),'execute_receipt_sha256':digest(a.execute_receipt),'run_state_sha256':digest(sp),'independent_replay':replay,'check_execution':check_execution,'clean_replay':clean_replay,'judge_receipt_sha256':judge_hash,'bifrost_correlation':None,'ringside_read_only':[],'accept_mode':'close','beads_close_reason':None,'authoritative_disposition':'accepted','transitions':chain}
  terminal_state='BEADS ACCEPTED'
  enrich(rec,m,'terminal','FRESH JUDGE' if judgment else 'INDEPENDENT CHECK REPLAY',terminal_state,predecessor={'receipt_id':ex['receipt_id'],'digest':digest(a.execute_receipt)},stage={'policy_evaluation':'all mandatory checks passed','accepted_evidence_set':[digest(sp)],'unresolved_discrepancy_count':0})
@@ -309,6 +341,7 @@ def accept(a):
  rec['claim_id']=ex['claim_id'];rec['beads_issue_version']=ex['beads_issue_version']
  # Finalize before any authority/projection write.  This object is never mutated.
  rec['integrity']={'digest':json_digest({k:v for k,v in rec.items() if k!='integrity'}),'attestation_type':'sha256-non-cryptographic','attested_by':'fleet-wave-controller'}
+ persist_transitions(a.receipt,chain)
  summary=json.dumps(rec,sort_keys=True);issue=m['beads']['issue_id'];bd(a,'comments','add',issue,summary)
  bd(a,'close',issue,'--reason',close_reason);show_disposition(a,m,'closed')
  write_receipt(a.receipt,rec);terminal_digest=digest(a.receipt)
