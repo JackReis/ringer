@@ -56,21 +56,24 @@ def parse_item(output,label='Beads'):
 def bd(a,*parts):
  env=os.environ.copy();env['BEADS_DIR']=a.beads_store
  return run([a.bd_bin,*parts,'--json'],env=env)
-def claim(a,m,status='in_progress',acquire=False,expected_version=None):
- issue=m['beads']['issue_id']
- if acquire:
-  parts=['claim','acquire',issue,'--claimant',m['beads']['claimant'],'--attempt-id',m['attempt_id'],'--authority-host',m['beads']['host'],'--store-locator',m['beads']['store']]
-  if expected_version is not None:parts += ['--expected-version',str(expected_version)]
-  item=parse_item(bd(a,*parts).stdout)
- else:item=parse_item(bd(a,'show',issue).stdout)
- if item.get('id')!=issue or item.get('status')!=status or item.get('assignee')!=m['beads']['claimant']:raise ProtocolError('Beads readback does not exactly match issue, status, and claimant')
- if item.get('authority_host')!=m['beads']['host'] or item.get('store_locator')!=m['beads']['store']:raise ProtocolError('Beads response does not prove authority host/store')
- if not nonempty(item.get('claim_id')) or item.get('attempt_id')!=m['attempt_id'] or not nonempty(str(item.get('issue_version',''))):raise ProtocolError('Beads response lacks attempt-bound atomic claim proof')
- if dt(item.get('lease_expires_at'))<=datetime.now(timezone.utc):raise ProtocolError('Beads claim lease is absent or expired')
- caps=item.get('capabilities');conc=item.get('concurrency')
- if not isinstance(caps,list) or 'dispatch' not in caps or not isinstance(conc,dict) or type(conc.get('active')) is not int or type(conc.get('limit')) is not int or conc['active']<0 or conc['limit']<1 or conc['active']>=conc['limit']:raise ProtocolError('Beads response lacks dispatch capability/concurrency capacity')
- if item.get('reservation') not in ('acquired','renewed','idempotent'):raise ProtocolError('Beads response lacks atomic dispatch reservation')
+def validate_beads_item(item,m,status,active=True):
+ issue=m['beads']['issue_id'];claimant=m['beads']['claimant']
+ if item.get('id')!=issue or item.get('status')!=status:raise ProtocolError('Beads readback does not exactly match issue and status')
+ if active and item.get('assignee')!=claimant:raise ProtocolError('Beads readback does not exactly match claimant')
+ if active:
+  if not nonempty(item.get('updated_at')):raise ProtocolError('Beads active claim readback lacks updated_at')
+  dt(item['updated_at'])
  return item
+def claim(a,m):
+ issue=m['beads']['issue_id'];claimant=m['beads']['claimant']
+ updated=parse_item(bd(a,'update',issue,'--claim','--actor',claimant).stdout)
+ validate_beads_item(updated,m,'in_progress')
+ item=validate_beads_item(parse_item(bd(a,'show',issue).stdout),m,'in_progress')
+ if any(updated.get(k)!=item.get(k) for k in ('id','status','assignee','updated_at')):raise ProtocolError('Beads atomic claim and exact readback differ')
+ evidence={'issue_id':item['id'],'claimant':item['assignee'],'attempt_id':m['attempt_id'],'updated_at':item['updated_at']}
+ return {**evidence,'evidence_digest':json_digest(evidence),'lease_supported':False,'atomic_operation':'bd update ISSUE --claim --actor CLAIMANT --json'}
+def show_disposition(a,m,status):
+ return validate_beads_item(parse_item(bd(a,'show',m['beads']['issue_id']).stdout),m,status,active=False)
 def transition(m,name,previous=None,result='PASS',evidence=None,reason=None):
  t={'receipt_id':f"{m['attempt_id']}:{name}",'transition':name,'result':result,'reason_code':reason,'predecessor':None if previous is None else {'receipt_id':previous['receipt_id'],'digest':previous['integrity']['digest']},'evidence':evidence or []}
  t['integrity']={'digest':json_digest(t)};return t
@@ -159,7 +162,7 @@ def validate_prepared_receipt(r,m):
  if r['schema_version']!='fleet-wave.v1' or r['event']!='prepared' or not nonempty(r['wave_id']) or not sha(r['manifest_sha256']) or not sha(r['ringer_manifest_sha256']) or r['dispatch_authorized'] is not True:raise ProtocolError('invalid prepared receipt fields')
  dt(r['prepared_at'])
  if r['beads_authority']!=m['beads']:raise ProtocolError('prepared receipt authority mismatch')
- if r['claim_id']!=r['claim_proof'].get('claim_id'):raise ProtocolError('prepared receipt claim binding mismatch')
+ if r['claim_id']!=r['claim_proof'].get('evidence_digest') or r['beads_issue_version']!=r['claim_proof'].get('updated_at') or r['claim_proof'].get('lease_supported') is not False:raise ProtocolError('prepared receipt claim binding mismatch')
  validate_transitions(r['transitions'],['INTAKE','LEDGERED','CLAIMED',f"MANIFEST-v{m['manifest_version']}",'LINTED','DRY-RUN','PAPERCLIP PREPARED RECEIPT'])
 def validate_execute_receipt(r):
  required={'schema_version','event','executed_at','wave_id','manifest_sha256','ringer_manifest_sha256','prepared_receipt_sha256','run_state_path','run_state_sha256','replay_inputs','transitions','protocol_version','receipt_id','receipt_type','authority','work_id','beads_issue_version','claim_id','attempt_id','manifest_version','manifest_digest','predecessor','actor','timestamps','transition','result','reason_code','evidence','integrity','stage_extension'}
@@ -196,7 +199,7 @@ def replay_child(a):
   if r.returncode:raise ProtocolError('independent replay check failed')
 def prepare(a):
  p,m,rp=context(a);b=m['beads']
- try:claim_item=claim(a,m,acquire=True)
+ try:claim_item=claim(a,m)
  except ProtocolError as e:
   rec={'schema_version':'fleet-wave.v1','event':'claim_unknown_degraded','prepared_at':now(),'wave_id':m['wave_id'],'manifest_sha256':digest(p),'ringer_manifest_sha256':digest(rp),'beads_authority':b,'dispatch_authorized':False}
   enrich(rec,m,'degraded-prepare','INTAKE','UNKNOWN_DEGRADED',result='DEGRADED',reason='claim_error',stage={'claim_state':'UNKNOWN_DEGRADED','dispatch_allowed':False,'authoritative':False,'error':str(e)});rec['claim_id']=None;rec['integrity']={'digest':json_digest({k:v for k,v in rec.items() if k!='integrity'}),'attestation_type':'sha256-non-cryptographic','attested_by':'fleet-wave-controller'};write_receipt(a.receipt,rec)
@@ -216,14 +219,13 @@ def prepare(a):
  names=['INTAKE','LEDGERED','CLAIMED',f"MANIFEST-v{m['manifest_version']}",'LINTED','DRY-RUN','PAPERCLIP PREPARED RECEIPT']
  rec={'schema_version':'fleet-wave.v1','event':'prepared','prepared_at':now(),'wave_id':m['wave_id'],'manifest_sha256':digest(p),'ringer_manifest_sha256':digest(rp),'beads_authority':b,'dispatch_authorized':True,'claim_proof':claim_item,'transitions':transition_chain(m,names)}
  enrich(rec,m,'prepared','DRY-RUN','PAPERCLIP PREPARED RECEIPT',stage={'paperclip_readbacks':paperclip_readbacks,'mirrored_beads_snapshot_digest':json_digest(b),'execution_envelope_digest':digest(rp)})
- rec['claim_id']=claim_item['claim_id'];rec['integrity']={'digest':json_digest({k:v for k,v in rec.items() if k!='integrity'}),'attestation_type':'sha256-non-cryptographic','attested_by':'fleet-wave-controller'}
+ rec['claim_id']=claim_item['evidence_digest'];rec['beads_issue_version']=claim_item['updated_at'];rec['integrity']={'digest':json_digest({k:v for k,v in rec.items() if k!='integrity'}),'attestation_type':'sha256-non-cryptographic','attested_by':'fleet-wave-controller'}
  write_receipt(a.receipt,rec)
  if 'paperclip' in m:
   payload=json.dumps(rec,sort_keys=True);posted=parse_item(run([a.paperclip_bin,'comment',m['paperclip']['issue_id'],payload,'--idempotency-key',rec['receipt_id'],'--json']).stdout,'Paperclip')
   if posted.get('payload_sha256')!=hashlib.sha256(payload.encode()).hexdigest() or posted.get('issue_id') not in (paperclip_readbacks[0]['identifier'],paperclip_readbacks[0]['canonical_id']):raise ProtocolError('Paperclip prepared receipt readback mismatch')
 def execute(a):
- p,m,rp=context(a);prep=load(a.prepared_receipt);validate_prepared_receipt(prep,m);validate_integrity(prep);binding(p,m,rp,prep,'prepared');live=claim(a,m,acquire=True,expected_version=prep['claim_proof']['issue_version'])
- if live['claim_id']!=prep['claim_id']:raise ProtocolError('live claim changed since prepare')
+ p,m,rp=context(a);prep=load(a.prepared_receipt);validate_prepared_receipt(prep,m);validate_integrity(prep);binding(p,m,rp,prep,'prepared');live=claim(a,m)
  runs=resolve(p.parent,m['ringer_state_dir']).resolve()/'runs';before={x.resolve():digest(x) for x in runs.glob('*.json')} if runs.is_dir() else {}
  run([a.ringer_bin,'run',str(rp)])
  after={x.resolve():digest(x) for x in runs.glob('*.json')} if runs.is_dir() else {}
@@ -232,7 +234,7 @@ def execute(a):
  if len(new)!=1:raise ProtocolError(f'Ringer must create exactly one new run-state receipt; found {len(new)}')
  state=next(iter(new));snapshots=snapshot_tasks(a.receipt,m,load(state));rec={'schema_version':'fleet-wave.v1','event':'executed','executed_at':now(),'wave_id':m['wave_id'],'manifest_sha256':digest(p),'ringer_manifest_sha256':digest(rp),'prepared_receipt_sha256':digest(a.prepared_receipt),'run_state_path':str(state),'run_state_sha256':digest(state),'replay_inputs':snapshots,'transitions':prep['transitions']+[transition(m,'RINGER RUN',prep['transitions'][-1])]}
  enrich(rec,m,'executed','PAPERCLIP PREPARED RECEIPT','RINGER RUN',predecessor={'receipt_id':prep['receipt_id'],'digest':digest(a.prepared_receipt)},stage={'run_state_path':str(state),'run_state_sha256':digest(state)})
- rec['claim_id']=live['claim_id'];rec['integrity']={'digest':json_digest({k:v for k,v in rec.items() if k!='integrity'}),'attestation_type':'sha256-non-cryptographic','attested_by':'fleet-wave-controller'}
+ rec['claim_id']=live['evidence_digest'];rec['beads_issue_version']=live['updated_at'];rec['integrity']={'digest':json_digest({k:v for k,v in rec.items() if k!='integrity'}),'attestation_type':'sha256-non-cryptographic','attested_by':'fleet-wave-controller'}
  write_receipt(a.receipt,rec)
 def validate_state(s,keys):
  if not nonempty(s.get('run_id')):raise ProtocolError('Ringer run_id must be a nonempty scalar string')
@@ -304,10 +306,11 @@ def accept(a):
  enrich(rec,m,'terminal','FRESH JUDGE' if judgment else 'INDEPENDENT CHECK REPLAY',terminal_state,predecessor={'receipt_id':ex['receipt_id'],'digest':digest(a.execute_receipt)},stage={'policy_evaluation':'all mandatory checks passed','accepted_evidence_set':[digest(sp)],'unresolved_discrepancy_count':0})
  close_reason=f"Fleet Wave accepted: wave_id={m['wave_id']}; manifest_sha256={digest(p)}; execute_receipt_sha256={digest(a.execute_receipt)}"
  rec['beads_close_reason']=close_reason
+ rec['claim_id']=ex['claim_id'];rec['beads_issue_version']=ex['beads_issue_version']
  # Finalize before any authority/projection write.  This object is never mutated.
  rec['integrity']={'digest':json_digest({k:v for k,v in rec.items() if k!='integrity'}),'attestation_type':'sha256-non-cryptographic','attested_by':'fleet-wave-controller'}
  summary=json.dumps(rec,sort_keys=True);issue=m['beads']['issue_id'];bd(a,'comments','add',issue,summary)
- bd(a,'close',issue,'--reason',close_reason);claim(a,m,'closed')
+ bd(a,'close',issue,'--reason',close_reason);show_disposition(a,m,'closed')
  write_receipt(a.receipt,rec);terminal_digest=digest(a.receipt)
  if 'paperclip' in m:
   try:
@@ -337,10 +340,11 @@ def block(a):
  except ProtocolError as e:authoritative=False;claim_error=str(e);live=None
  rec={'schema_version':'fleet-wave.v1','event':'blocked' if authoritative else 'local_incident','accepted_at':now(),'wave_id':m['wave_id'],'manifest_sha256':digest(p),'ringer_manifest_sha256':digest(rp)}
  enrich(rec,m,'terminal-blocked',failed,'BEADS BLOCKED' if authoritative else 'UNKNOWN_DEGRADED',predecessor={'receipt_id':pred.get('receipt_id'),'digest':digest(a.predecessor_receipt)},result='BLOCKED' if authoritative else 'DEGRADED',reason=a.reason_code,stage={'policy_evaluation':'fail-closed','failed_stage':failed,'unresolved_discrepancy_count':1,'authoritative':authoritative,'claim_error':claim_error})
- rec['claim_id']=live['claim_id'] if live else None;rec['integrity']={'digest':json_digest({k:v for k,v in rec.items() if k!='integrity'}),'attestation_type':'sha256-non-cryptographic','attested_by':'fleet-wave-controller'}
+ rec['claim_id']=live['evidence_digest'] if live else None;rec['beads_issue_version']=live['updated_at'] if live else 'unavailable';rec['integrity']={'digest':json_digest({k:v for k,v in rec.items() if k!='integrity'}),'attestation_type':'sha256-non-cryptographic','attested_by':'fleet-wave-controller'}
  if authoritative:
-  rb=parse_item(bd(a,'block',m['beads']['issue_id'],'--expected-version',str(live['issue_version']),'--receipt',json.dumps(rec,sort_keys=True)).stdout)
-  if rb.get('id')!=m['beads']['issue_id'] or rb.get('status')!='blocked' or rb.get('receipt_id')!=rec['receipt_id']:raise ProtocolError('Beads blocked disposition readback mismatch')
+  receipt=json.dumps(rec,sort_keys=True)
+  validate_beads_item(parse_item(bd(a,'update',m['beads']['issue_id'],'--status','blocked','--append-notes',receipt,'--actor',m['beads']['claimant']).stdout),m,'blocked',active=False)
+  show_disposition(a,m,'blocked')
  write_receipt(a.receipt,rec)
 def parser():
  c=argparse.ArgumentParser(add_help=False)

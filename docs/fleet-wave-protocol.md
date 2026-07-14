@@ -8,7 +8,7 @@ Start from `templates/fleet-wave/manifest-v1.json`; validate against `schema/fle
 
 Every work type—including `other`—requires a criterion-specific `check` and at least two structured executable negative controls (`name` plus fixture-mutating `setup`). Execute creates an immutable content-addressed inventory/snapshot. Acceptance launches `replay-one` as a distinct checker subprocess with a minimal environment, validates the snapshot digest, and never reruns against the mutable worker directory. Every negative fixture is derived from that snapshot and must make the same check exit nonzero. This rejects `true`, `exit 0`, wrappers, and test-only/existence-only checks; expected-file existence is only an artifact precondition.
 
-Paperclip readback accepts the requested key only when it equals returned `identifier` or canonical `id`; both values are retained in the prepared receipt. Beads readback remains exact for ID, status, claimant, host and store.
+Paperclip readback accepts the requested key only when it equals returned `identifier` or canonical `id`; both values are retained in the prepared receipt. Beads authority is bound by the controller's actual hostname, `BEADS_DIR`, and exact invocation; native issue readback is exact for ID, status, and (while active) claimant.
 
 ## Commands and state order
 
@@ -25,7 +25,7 @@ python3 tools/fleet_wave.py accept manifest-v1.json --prepared-receipt prepared.
  --beads-store STORE --beads-claimant CLAIMANT --receipt terminal.json
 ```
 
-Prepare invokes the fakeable atomic Beads `claim acquire` CLI/CAS operation, binding claimant, attempt, authority and dispatch reservation. Every claim error writes local `UNKNOWN_DEGRADED`, `dispatch_allowed:false`, non-authoritative truth, exits nonzero, and performs no Ringer or Paperclip operation. Execute renews with the prepared issue version immediately before dispatch. It requires the same claim ID and exactly one new immutable Ringer run receipt.
+Prepare and execute each invoke native atomic `bd update ISSUE --claim --actor CLAIMANT --json`, followed by exact `bd show ISSUE --json` readback. Claim evidence is a deterministic digest of the returned issue ID, exact claimant, manifest attempt ID, and `updated_at`; native Beads leases are explicitly recorded as unsupported, never fabricated. Every claim error writes local `UNKNOWN_DEGRADED`, `dispatch_allowed:false`, non-authoritative truth, exits nonzero, and performs no Ringer or Paperclip operation. Execute re-runs the idempotent atomic claim immediately before dispatch and requires exactly one new immutable Ringer run receipt.
 
 The exact state order is `INTAKE → LEDGERED → CLAIMED → MANIFEST-vN → LINTED → DRY-RUN → PAPERCLIP PREPARED RECEIPT → RINGER RUN → INDEPENDENT CHECK REPLAY → FRESH JUDGE` (only for judgmental work) `→ BEADS ACCEPTED/BLOCKED → Paperclip mirror → Ringside GETs`. A prepared receipt may carry the pre-execution states as one immutable composite bundle, but every transition is separately predecessor-chained; it never claims a walkthrough. Judgmental criteria require a fresh never-resumed Judge, a configured harness-secret HMAC over the complete attestation, and normalized principal/session non-overlap with controller and replay checker. There is no receipt-only pseudo-terminal: acceptance always closes and reads back Beads. Projection degradations use unique stage-specific immutable receipts.
 
@@ -41,4 +41,4 @@ python3 tools/fleet_wave.py block manifest-v1.json --predecessor-receipt prior.j
  --beads-host HOST --beads-store STORE --beads-claimant CLAIMANT --receipt blocked.json
 ```
 
-Allowed failed stages are LEDGERED, CLAIMED, MANIFEST-vN, LINTED, DRY-RUN, PAPERCLIP PREPARED RECEIPT, RINGER RUN, INDEPENDENT CHECK REPLAY, and FRESH JUDGE. The command revalidates the claim, appends the chained `BEADS BLOCKED` receipt to Beads, and writes it append-only locally. Failures never become acceptance; projection outages are the sole degraded post-terminal case.
+Allowed failed stages are LEDGERED, CLAIMED, MANIFEST-vN, LINTED, DRY-RUN, PAPERCLIP PREPARED RECEIPT, RINGER RUN, INDEPENDENT CHECK REPLAY, and FRESH JUDGE. The command revalidates the claim, atomically runs `bd update ISSUE --status blocked --append-notes RECEIPT --actor CLAIMANT --json`, verifies exact show/readback, and writes the receipt append-only locally. Failures never become acceptance; projection outages are the sole degraded post-terminal case.

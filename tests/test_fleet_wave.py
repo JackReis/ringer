@@ -12,13 +12,15 @@ class FleetWaveTests(unittest.TestCase):
   self.bd=executable(self.root/'bd',"""import json,os,sys
 with open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps(['bd',*sys.argv[1:]])+'\\n')
 if os.environ.get('BEADS_DIR')!='/ledger/main.db':raise SystemExit(7)
-marker=os.environ['CALL_LOG']+'.closed'
+marker=os.environ['CALL_LOG']+'.closed'; blocked=os.environ['CALL_LOG']+'.blocked'
 if os.environ.get('BD_FAIL')=='1' and 'close' in sys.argv:raise SystemExit(9)
 if 'close' in sys.argv:open(marker,'w').close()
-status='closed' if os.path.exists(marker) else os.environ.get('BD_STATUS','in_progress')
-requested=sys.argv[3] if sys.argv[1:3]==['claim','acquire'] else (sys.argv[2] if len(sys.argv)>2 else 'x')
+if sys.argv[1:3]==['update','bead-child'] and '--status' in sys.argv and sys.argv[sys.argv.index('--status')+1]=='blocked':open(blocked,'w').close()
+status='closed' if os.path.exists(marker) else ('blocked' if os.path.exists(blocked) else os.environ.get('BD_STATUS','in_progress'))
+requested=sys.argv[2] if len(sys.argv)>2 else 'x'
 item_id=os.environ.get('BD_WRONG_ID',requested) if requested==os.environ.get('BD_WRONG_ID_TARGET',requested) else requested
-item={'id':item_id,'status':status,'assignee':os.environ.get('BD_ASSIGNEE','alice'),'authority_host':os.uname().nodename,'store_locator':'/ledger/main.db','claim_id':os.environ.get('BD_CLAIM_ID','claim-live-1'),'attempt_id':'attempt-1','issue_version':'7','reservation':'acquired','lease_expires_at':os.environ.get('BD_LEASE','2999-01-01T00:00:00Z'),'capabilities':['dispatch'],'concurrency':{'active':int(os.environ.get('BD_ACTIVE','0')),'limit':1}}
+item={'id':item_id,'status':status,'assignee':os.environ.get('BD_ASSIGNEE','alice')}
+if os.environ.get('BD_MISSING_UPDATED_AT')!='1':item['updated_at']=os.environ.get('BD_UPDATED_AT','2026-07-14T12:00:00Z')
 n=int(os.environ.get('BD_ARRAY','1')) if requested==os.environ.get('BD_ARRAY_ID',requested) else 1
 print(json.dumps(item if n==-1 else [item]*n))
 """)
@@ -50,7 +52,7 @@ print(json.dumps({'runs':[{'run_id':'r1'}]} if sys.argv[-1].endswith('/api/runs'
  def write_manifest(self,**kw):
   d={'schema_version':'fleet-wave.v1','manifest_version':1,'wave_id':'wave','attempt_id':'attempt-1','supersedes':None,'ringer_manifest':str(self.rm),'ringer_state_dir':str(self.runs.parent),'beads':{'host':socket.gethostname(),'store':'/ledger/main.db','claimant':'alice','issue_id':'bead-child','existing_ids':[]},'paperclip':{'issue_id':'pc-parent','existing_ids':[]},'ringside':{'base_url':'http://127.0.0.1:9999'},'bifrost':{'correlation':None},'tasks':[{'key':'alpha','work_type':'other','check':'test -s proof.txt && grep -q proof proof.txt','negative_controls':[{'name':'missing artifact','setup':'rm -f proof.txt'},{'name':'wrong content','setup':"printf 'wrong\\n' > proof.txt"}],'evidence':{'strength':'strong','kind':'objective'}}]};d.update(kw);self.m.write_text(json.dumps(d))
  def cli(self,cmd,extra=(),env=None):
-  receipts={'prepare':self.prep,'execute':self.exe,'accept':self.done}; a=[sys.executable,str(TOOL),cmd,str(self.m),'--bd-bin',str(self.bd),'--ringer-bin',str(self.ringer),'--paperclip-bin',str(self.pc),'--ringside-bin',str(self.ringside),'--beads-host',socket.gethostname(),'--beads-store','/ledger/main.db','--beads-claimant','alice','--receipt',str(receipts[cmd])]
+  receipts={'prepare':self.prep,'execute':self.exe,'accept':self.done,'block':self.done}; a=[sys.executable,str(TOOL),cmd,str(self.m),'--bd-bin',str(self.bd),'--ringer-bin',str(self.ringer),'--paperclip-bin',str(self.pc),'--ringside-bin',str(self.ringside),'--beads-host',socket.gethostname(),'--beads-store','/ledger/main.db','--beads-claimant','alice','--receipt',str(receipts[cmd])]
   if cmd=='execute':a += ['--prepared-receipt',str(self.prep)]
   if cmd=='accept':a += ['--prepared-receipt',str(self.prep),'--execute-receipt',str(self.exe)]
   e=os.environ.copy();e.update({'CALL_LOG':str(self.log),'RUNS':str(self.runs),'TASKDIR':str(self.work/'alpha')});e.update(env or {})
@@ -61,7 +63,7 @@ print(json.dumps({'runs':[{'run_id':'r1'}]} if sys.argv[-1].endswith('/api/runs'
  def execute_ok(self):
   self.prepare_ok();r=self.cli('execute');self.assertEqual(0,r.returncode,r.stderr);self.log.unlink()
  def test_prepare_accepts_array_and_posts_projection_only_after_lint_dryrun(self):
-  r=self.cli('prepare');self.assertEqual(0,r.returncode,r.stderr); c=self.calls(); lint=['ringer','lint',str(self.rm.resolve())];dry=['ringer','run',str(self.rm.resolve()),'--dry-run'];post=next(x for x in c if x[:2]==['paperclip','comment']);self.assertFalse(any(x[:2]==['bd','update'] for x in c));self.assertEqual(['bd','claim','acquire','bead-child'],c[0][:4]);self.assertLess(c.index(lint),c.index(dry));self.assertLess(c.index(dry),c.index(post));self.assertEqual('prepared',json.loads(self.prep.read_text())['event'])
+  r=self.cli('prepare');self.assertEqual(0,r.returncode,r.stderr); c=self.calls(); lint=['ringer','lint',str(self.rm.resolve())];dry=['ringer','run',str(self.rm.resolve()),'--dry-run'];post=next(x for x in c if x[:2]==['paperclip','comment']);self.assertEqual(['bd','update','bead-child','--claim','--actor','alice','--json'],c[0]);self.assertEqual(['bd','show','bead-child','--json'],c[1]);self.assertLess(c.index(lint),c.index(dry));self.assertLess(c.index(dry),c.index(post));rec=json.loads(self.prep.read_text());self.assertEqual('prepared',rec['event']);self.assertFalse(rec['claim_proof']['lease_supported']);self.assertEqual(64,len(rec['claim_id']))
  def test_prepare_requires_exact_claimant_and_status(self):
   for env in ({'BD_ASSIGNEE':'bob'},{'BD_STATUS':'open'}):
    r=self.cli('prepare',env=env);self.assertNotEqual(0,r.returncode);self.assertNotIn('ringer',[x[0] for x in self.calls()]);self.log.unlink()
@@ -69,7 +71,7 @@ print(json.dumps({'runs':[{'run_id':'r1'}]} if sys.argv[-1].endswith('/api/runs'
   for flag,value in (('--beads-host','other'),('--beads-store','/other')):
    r=self.cli('prepare',(flag,value));self.assertNotEqual(0,r.returncode);self.assertFalse(self.log.exists())
  def test_execute_rereads_claim_then_dispatches_and_binds_one_new_state(self):
-  self.prepare_ok();r=self.cli('execute');self.assertEqual(0,r.returncode,r.stderr);c=self.calls();cas=next(i for i,x in enumerate(c) if x[1:3]==['claim','acquire']);dispatch=c.index(['ringer','run',str(self.rm.resolve())]);self.assertLess(cas,dispatch);rec=json.loads(self.exe.read_text());self.assertEqual(hashlib.sha256((self.runs/'r1.json').read_bytes()).hexdigest(),rec['run_state_sha256'])
+  self.prepare_ok();r=self.cli('execute');self.assertEqual(0,r.returncode,r.stderr);c=self.calls();cas=next(i for i,x in enumerate(c) if x[:3]==['bd','update','bead-child'] and '--claim' in x);dispatch=c.index(['ringer','run',str(self.rm.resolve())]);self.assertLess(cas,dispatch);rec=json.loads(self.exe.read_text());self.assertEqual(hashlib.sha256((self.runs/'r1.json').read_bytes()).hexdigest(),rec['run_state_sha256'])
  def test_execute_rejects_nonterminal_or_orphaned_and_ambiguous_receipts(self):
   self.prepare_ok();r=self.cli('execute',env={'BD_STATUS':'open'});self.assertNotEqual(0,r.returncode);self.assertNotIn('ringer',[x[0] for x in self.calls()]);self.log.unlink()
   (self.runs/'old.json').write_text('{}'); r=self.cli('execute',env={'BD_ASSIGNEE':''});self.assertNotEqual(0,r.returncode)
@@ -160,8 +162,10 @@ print(json.dumps({'runs':[{'run_id':'r1'}]} if sys.argv[-1].endswith('/api/runs'
    self.write_manifest();d=json.loads(self.m.read_text());d['tasks'][0]['check']=check;self.m.write_text(json.dumps(d))
    self.assertNotEqual(0,self.cli('prepare').returncode);self.assertFalse(self.log.exists())
  def test_live_claim_proof_is_mandatory_and_bound(self):
-  for env in ({'BD_CLAIM_ID':''},{'BD_LEASE':'2000-01-01T00:00:00Z'},{'BD_ACTIVE':'1'}):
+  for env in ({'BD_MISSING_UPDATED_AT':'1'},{'BD_WRONG_ID':'other','BD_WRONG_ID_TARGET':'bead-child'}):
    r=self.cli('prepare',env=env);self.assertNotEqual(0,r.returncode);self.assertEqual('UNKNOWN_DEGRADED',json.loads(self.prep.read_text())['stage_extension']['claim_state']);self.assertNotIn('ringer',[x[0] for x in self.calls()]);self.prep.unlink();self.log.unlink()
+ def test_block_uses_native_update_and_exact_readback(self):
+  self.prepare_ok();r=self.cli('block',('--predecessor-receipt',str(self.prep),'--failed-stage','LINTED','--reason-code','lint_failure'));self.assertEqual(0,r.returncode,r.stderr);c=self.calls();update=next(x for x in c if x[:3]==['bd','update','bead-child'] and '--status' in x);self.assertIn('blocked',update);self.assertIn('--append-notes',update);self.assertIn('--actor',update);self.assertEqual(['bd','show','bead-child','--json'],c[-1])
  def test_transition_chain_e3_e4_and_receipted_disposition(self):
   self.execute_ok();r=self.cli('accept');self.assertEqual(0,r.returncode,r.stderr);rec=json.loads(self.done.read_text());self.assertEqual('accepted',rec['authoritative_disposition']);self.assertEqual('BEADS ACCEPTED',rec['transition']['to']);self.assertIn('stdout_sha256',rec['check_execution']['alpha']);self.assertTrue(rec['clean_replay']['alpha']['isolated_copy']);self.assertEqual(2,len(rec['clean_replay']['alpha']['negative_controls']));self.assertEqual(['INTAKE','LEDGERED','CLAIMED','MANIFEST-v1','LINTED','DRY-RUN','PAPERCLIP PREPARED RECEIPT','RINGER RUN','INDEPENDENT CHECK REPLAY','BEADS ACCEPTED'],[x['transition'] for x in rec['transitions']])
  def test_structured_negative_controls_reject_wrapped_noop(self):
