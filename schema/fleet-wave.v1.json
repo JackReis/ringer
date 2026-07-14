@@ -2,26 +2,35 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "fleet-wave.v1.json",
   "title": "Fleet Wave manifest v1",
+  "$comment": "Standard JSON Schema cannot express all controller-enforced semantic constraints: each issue_id must be absent from its sibling existing_ids array, and duplicate task keys are forbidden across tasks. tools/fleet_wave.py enforces both constraints fail-closed.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "manifest_version", "wave_id", "supersedes", "ringer_manifest", "beads", "tasks"],
+  "required": ["schema_version", "manifest_version", "wave_id", "supersedes", "ringer_manifest", "ringer_state_dir", "beads", "tasks"],
+  "allOf": [{
+    "if": {"properties": {"manifest_version": {"const": 1}}, "required": ["manifest_version"]},
+    "then": {"properties": {"supersedes": {"type": "null"}}},
+    "else": {"properties": {"supersedes": {"$ref": "#/$defs/supersedes"}}}
+  }],
   "properties": {
     "schema_version": {"const": "fleet-wave.v1"},
     "manifest_version": {"type": "integer", "minimum": 1},
-    "wave_id": {"type": "string", "minLength": 1},
-    "supersedes": {"type": ["string", "null"]},
-    "run_name": {"type": "string"},
-    "workdir": {"type": "string"},
+    "wave_id": {"type": "string", "minLength": 1, "pattern": "\\S"},
+    "supersedes": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/supersedes"}]},
+    "run_name": {"type": "string", "minLength": 1, "pattern": "\\S"},
+    "workdir": {"type": "string", "minLength": 1, "pattern": "\\S"},
     "max_parallel": {"type": "integer", "minimum": 1},
-    "ringer_manifest": {"type": "string", "minLength": 1},
-    "beads": {"$ref": "#/$defs/beads"},
-    "paperclip": {"$ref": "#/$defs/paperclip"},
+    "ringer_manifest": {"type": "string", "minLength": 1, "pattern": "\\S"},
+    "ringer_state_dir": {"type": "string", "minLength": 1, "pattern": "\\S"},
+    "beads": {"description": "Canonical Beads authority. Controller-enforced semantic constraint: issue_id must not occur in existing_ids.", "type": "object", "additionalProperties": false, "required": ["host", "store", "claimant", "issue_id", "existing_ids"], "properties": {"host": {"type": "string", "minLength": 1, "pattern": "\\S"}, "store": {"type": "string", "minLength": 1, "pattern": "\\S"}, "claimant": {"type": "string", "minLength": 1, "pattern": "\\S"}, "issue_id": {"type": "string", "minLength": 1, "pattern": "\\S"}, "existing_ids": {"$ref": "#/$defs/ids"}}},
+    "paperclip": {"$ref": "#/$defs/issueSurface"},
+    "ringside": {"type": "object", "additionalProperties": false, "required": ["base_url"], "properties": {"base_url": {"type": "string", "minLength": 1, "pattern": "\\S"}}},
+    "bifrost": {"type": "object", "additionalProperties": false, "required": ["correlation"], "properties": {"correlation": {"type": "null"}}},
     "tasks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/task"}}
   },
   "$defs": {
-    "ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
-    "beads": {"type": "object", "additionalProperties": false, "required": ["claim_id", "existing_ids"], "properties": {"claim_id": {"type": "string", "minLength": 1}, "existing_ids": {"$ref": "#/$defs/ids"}}},
-    "paperclip": {"type": "object", "additionalProperties": false, "required": ["issue_id", "existing_ids"], "properties": {"issue_id": {"type": "string", "minLength": 1}, "existing_ids": {"$ref": "#/$defs/ids"}}},
-    "task": {"type": "object", "additionalProperties": false, "required": ["key", "work_type", "evidence"], "properties": {"key": {"type": "string", "minLength": 1}, "work_type": {"enum": ["code", "deployment", "config", "factual-research", "other"]}, "spec": {"type": "string"}, "check": {"type": "string"}, "expect_files": {"type": "array", "items": {"type": "string"}}, "verified": {"type": "string"}, "evidence": {"type": "object", "additionalProperties": false, "required": ["strength", "kind"], "properties": {"strength": {"const": "strong"}, "kind": {"enum": ["objective", "judgmental"]}}}}}
+    "supersedes": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"type": "string", "minLength": 1, "pattern": "\\S"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}},
+    "ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "pattern": "\\S"}},
+    "issueSurface": {"description": "Issue authority surface. Controller-enforced semantic constraint: issue_id must not occur in existing_ids.", "type": "object", "additionalProperties": false, "required": ["issue_id", "existing_ids"], "properties": {"issue_id": {"type": "string", "minLength": 1, "pattern": "\\S"}, "existing_ids": {"$ref": "#/$defs/ids"}}},
+    "task": {"description": "Task declaration. Controller-enforced semantic constraint: every task key must be unique across the tasks array; standard JSON Schema uniqueItems cannot compare one property across objects.", "type": "object", "additionalProperties": false, "required": ["key", "work_type", "evidence"], "properties": {"key": {"type": "string", "minLength": 1, "pattern": "\\S"}, "work_type": {"enum": ["code", "deployment", "config", "factual-research", "other"]}, "spec": {"type": "string", "minLength": 1, "pattern": "\\S"}, "check": {"type": "string", "minLength": 1, "pattern": "\\S"}, "expect_files": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "pattern": "\\S"}}, "verified": {"type": "string", "minLength": 1, "pattern": "\\S"}, "evidence": {"type": "object", "additionalProperties": false, "required": ["strength", "kind"], "properties": {"strength": {"const": "strong"}, "kind": {"enum": ["objective", "judgmental"]}}}}}
   }
 }

@@ -1,157 +1,150 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-
-import json
-import os
-import subprocess
-import sys
-import tempfile
-import unittest
+import hashlib, json, os, socket, subprocess, sys, tempfile, unittest
 from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[1]
-TOOL = ROOT / "tools" / "fleet_wave.py"
-
-
-def executable(path: Path, body: str) -> Path:
-    path.write_text("#!/usr/bin/env python3\n" + body, encoding="utf-8")
-    path.chmod(0o755)
-    return path
-
-
-class FleetWaveCLITests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self.tmp.name)
-        self.log = self.root / "calls.jsonl"
-        self.bd = executable(self.root / "bd", """
-import json, os, sys
-with open(os.environ['CALL_LOG'], 'a') as f: f.write(json.dumps(['bd', *sys.argv[1:]])+'\\n')
-if os.environ.get('BD_FAIL') == '1': raise SystemExit(9)
-print(json.dumps({'id': sys.argv[2] if len(sys.argv)>2 else 'x', 'status': os.environ.get('BD_STATUS', 'in_progress'), 'assignee': os.environ.get('BD_ASSIGNEE', 'fleet')}))
+ROOT=Path(__file__).resolve().parents[1]; TOOL=ROOT/'tools/fleet_wave.py'
+def executable(path, body):
+ path.write_text('#!/usr/bin/env python3\n'+body); path.chmod(0o755); return path
+class FleetWaveTests(unittest.TestCase):
+ def setUp(self):
+  self.t=tempfile.TemporaryDirectory(); self.root=Path(self.t.name); self.log=self.root/'calls.jsonl'; self.runs=self.root/'state'/'runs'; self.runs.mkdir(parents=True)
+  self.work=self.root/'work'; (self.work/'alpha').mkdir(parents=True); (self.work/'alpha'/'proof.txt').write_text('proof\n')
+  self.bd=executable(self.root/'bd',"""import json,os,sys
+with open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps(['bd',*sys.argv[1:]])+'\\n')
+if os.environ.get('BEADS_DIR')!='/ledger/main.db':raise SystemExit(7)
+marker=os.environ['CALL_LOG']+'.closed'
+if os.environ.get('BD_FAIL')=='1' and 'close' in sys.argv:raise SystemExit(9)
+if 'close' in sys.argv:open(marker,'w').close()
+status='closed' if os.path.exists(marker) else os.environ.get('BD_STATUS','in_progress')
+requested=sys.argv[2] if len(sys.argv)>2 else 'x'
+item_id=os.environ.get('BD_WRONG_ID',requested) if requested==os.environ.get('BD_WRONG_ID_TARGET',requested) else requested
+item={'id':item_id,'status':status,'assignee':os.environ.get('BD_ASSIGNEE','alice')}
+n=int(os.environ.get('BD_ARRAY','1')) if requested==os.environ.get('BD_ARRAY_ID',requested) else 1
+print(json.dumps(item if n==-1 else [item]*n))
 """)
-        self.ringer = executable(self.root / "ringer", """
-import json, os, sys
-with open(os.environ['CALL_LOG'], 'a') as f: f.write(json.dumps(['ringer', *sys.argv[1:]])+'\\n')
-raise SystemExit(0)
+  self.ringer=executable(self.root/'ringer',"""import json,os,sys,pathlib
+with open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps(['ringer',*sys.argv[1:]])+'\\n')
+if sys.argv[1]=='run' and '--dry-run' not in sys.argv:
+ d=pathlib.Path(os.environ['RUNS']); d.mkdir(parents=True,exist_ok=True); taskdir=pathlib.Path(os.environ['TASKDIR'])
+ state={'run_id':'r1','state':'finished','finished':True,'pass':1,'fail':0,'summary':{'pass':1,'fail':0,'tokens':0},'totals':{'running':0,'done':1,'pass':1,'fail':0,'tokens':0},'tasks':[{'key':'alpha','status':'pass','verdict':'PASS','check_returncode':0,'taskdir':str(taskdir)}]}
+ mode=os.environ.get('STATE_MODE','new')
+ if mode=='new':(d/'r1.json').write_text(json.dumps(state))
+ elif mode=='two':(d/'r1.json').write_text(json.dumps(state));(d/'r2.json').write_text(json.dumps(state))
+ elif mode=='overwrite':(d/'old.json').write_text(json.dumps(state))
 """)
-        self.paperclip = executable(self.root / "paperclip", """
-import json, os, sys
-with open(os.environ['CALL_LOG'], 'a') as f: f.write(json.dumps(['paperclip', *sys.argv[1:]])+'\\n')
+  self.pc=executable(self.root/'paperclip',"""import json,os,sys
+with open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps(['paperclip',*sys.argv[1:]])+'\\n')
+if len(sys.argv)>2 and sys.argv[1]=='show':print(json.dumps({'id':sys.argv[2]}))
 """)
-        self.ringer_manifest = self.root / "ringer.json"
-        self.work = self.root / "work"
-        (self.work / "alpha").mkdir(parents=True)
-        (self.work / "alpha" / "proof.txt").write_text("proof\n")
-        self.ringer_manifest.write_text(json.dumps({
-            "run_name": "wave", "workdir": str(self.work),
-            "tasks": [{"key": "alpha", "check": "test -s proof.txt", "expect_files": ["proof.txt"]}]
-        }))
-        self.manifest = self.root / "manifest-v1.json"
-        self.write_manifest()
-        self.prepared = self.root / "prepared.json"
-        self.post = self.root / "post.json"
-
-    def tearDown(self) -> None: self.tmp.cleanup()
-
-    def write_manifest(self, **updates) -> None:
-        data = {
-            "schema_version": "fleet-wave.v1", "manifest_version": 1, "wave_id": "wave-test",
-            "supersedes": None, "ringer_manifest": str(self.ringer_manifest),
-            "beads": {"claim_id": "bead-new", "existing_ids": ["bead-old"]},
-            "paperclip": {"issue_id": "pc-new", "existing_ids": ["pc-old"]},
-            "tasks": [{"key": "alpha", "work_type": "other", "evidence": {"strength": "strong", "kind": "objective"}}]
-        }
-        data.update(updates)
-        self.manifest.write_text(json.dumps(data))
-
-    def run_cli(self, command: str, extra=None, env=None):
-        args = [sys.executable, str(TOOL), command, str(self.manifest),
-                "--bd-bin", str(self.bd), "--ringer-bin", str(self.ringer),
-                "--paperclip-bin", str(self.paperclip)]
-        if command == "prepare": args += ["--receipt", str(self.prepared)]
-        else: args += ["--prepared-receipt", str(self.prepared), "--run-state", str(self.root/'run.json'), "--receipt", str(self.post)]
-        args += extra or []
-        e = os.environ.copy(); e["CALL_LOG"] = str(self.log); e.update(env or {})
-        return subprocess.run(args, text=True, capture_output=True, env=e)
-
-    def calls(self):
-        return [json.loads(x) for x in self.log.read_text().splitlines()] if self.log.exists() else []
-
-    def test_prepare_claims_reads_back_reconciles_lints_then_dry_runs_and_hashes(self):
-        result = self.run_cli("prepare")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        calls = self.calls()
-        self.assertLess(calls.index(["bd", "update", "bead-new", "--claim", "--json"]), calls.index(["bd", "show", "bead-new", "--json"]))
-        self.assertIn(["bd", "show", "bead-old", "--json"], calls)
-        self.assertIn(["paperclip", "show", "pc-new"], calls)
-        self.assertIn(["paperclip", "show", "pc-old"], calls)
-        lint = ["ringer", "lint", str(self.ringer_manifest)]
-        dry = ["ringer", "run", str(self.ringer_manifest), "--dry-run"]
-        self.assertLess(calls.index(lint), calls.index(dry))
-        receipt = json.loads(self.prepared.read_text())
-        self.assertEqual(receipt["event"], "prepared")
-        self.assertRegex(receipt["manifest_sha256"], r"^[0-9a-f]{64}$")
-        self.assertRegex(receipt["ringer_manifest_sha256"], r"^[0-9a-f]{64}$")
-
-    def test_prepare_rejects_bad_version_supersedes_and_weak_evidence_before_commands(self):
-        self.write_manifest(manifest_version=2, supersedes=None)
-        result = self.run_cli("prepare")
-        self.assertNotEqual(result.returncode, 0); self.assertFalse(self.log.exists())
-        self.write_manifest(tasks=[{"key": "alpha", "work_type": "other", "evidence": {"strength": "weak", "kind": "objective"}}])
-        result = self.run_cli("prepare")
-        self.assertNotEqual(result.returncode, 0); self.assertFalse(self.log.exists())
-
-    def test_prepare_rejects_unconfirmed_claim_and_weak_code_check(self):
-        result = self.run_cli("prepare", env={"BD_STATUS": "open"})
-        self.assertNotEqual(result.returncode, 0)
-        self.assertNotIn("ringer", [c[0] for c in self.calls()])
-        self.log.unlink()
-        self.write_manifest(tasks=[{"key": "alpha", "work_type": "code", "evidence": {"strength": "strong", "kind": "objective"}}])
-        result = self.run_cli("prepare")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertFalse(self.log.exists())
-
-    def test_prepare_degraded_mode_is_explicit_and_never_dispatches(self):
-        result = self.run_cli("prepare", ["--degraded-no-dispatch"], {"BD_FAIL": "1"})
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn("ringer", [c[0] for c in self.calls()])
-        self.assertTrue(json.loads(self.prepared.read_text())["degraded_no_dispatch"])
-
-    def prepare_ok(self):
-        result = self.run_cli("prepare")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.log.unlink()
-        (self.root / "run.json").write_text(json.dumps({"run_id": "r1", "verdict": "pass", "tasks": [{"key": "alpha", "verdict": "pass"}]}))
-
-    def test_post_run_replays_checks_and_reconciles_beads_before_paperclip(self):
-        self.prepare_ok()
-        result = self.run_cli("post-run")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        calls = self.calls()
-        bead_update = next(i for i,c in enumerate(calls) if c[:3] == ["bd", "comments", "add"])
-        pc_update = next(i for i,c in enumerate(calls) if c[:2] == ["paperclip", "comment"])
-        self.assertLess(bead_update, pc_update)
-        receipt = json.loads(self.post.read_text())
-        self.assertEqual(receipt["event"], "post-run")
-        self.assertEqual(receipt["ringer_verdict"], "pass")
-        self.assertTrue(receipt["independent_replay"]["alpha"])
-
-    def test_post_run_stops_before_paperclip_when_beads_fails(self):
-        self.prepare_ok()
-        result = self.run_cli("post-run", env={"BD_FAIL": "1"})
-        self.assertNotEqual(result.returncode, 0)
-        self.assertNotIn("paperclip", [c[0] for c in self.calls()])
-
-    def test_judgmental_task_requires_fresh_hash_bound_judge_receipt(self):
-        self.write_manifest(tasks=[{"key": "alpha", "work_type": "other", "evidence": {"strength": "strong", "kind": "judgmental"}}])
-        self.prepare_ok()
-        result = self.run_cli("post-run")
-        self.assertNotEqual(result.returncode, 0)
-        judge = self.root / "judge.json"
-        judge.write_text(json.dumps({"wave_id": "wave-test", "manifest_sha256": json.loads(self.prepared.read_text())["manifest_sha256"], "verdict": "pass", "judged_at": "2999-01-01T00:00:00Z"}))
-        result = self.run_cli("post-run", ["--judge-receipt", str(judge)])
-        self.assertEqual(result.returncode, 0, result.stderr)
-
-
-if __name__ == "__main__": unittest.main()
+  self.ringside=executable(self.root/'ringside',"""import json,os,sys
+with open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps(['ringside',*sys.argv[1:]])+'\\n')
+if os.environ.get('RINGSIDE_FAIL')=='1':raise SystemExit(8)
+print(json.dumps({'runs':[]} if sys.argv[-1].endswith('/api/runs') else {'artifacts':[]}))
+""")
+  self.rm=self.root/'ringer.json'; self.rm.write_text(json.dumps({'workdir':str(self.work),'tasks':[{'key':'alpha','check':'test -s proof.txt','expect_files':['proof.txt']}]}))
+  self.m=self.root/'manifest-v1.json'; self.write_manifest(); self.prep=self.root/'prepared.json'; self.exe=self.root/'executed.json'; self.done=self.root/'done.json'
+ def tearDown(self):self.t.cleanup()
+ def write_manifest(self,**kw):
+  d={'schema_version':'fleet-wave.v1','manifest_version':1,'wave_id':'wave','supersedes':None,'ringer_manifest':str(self.rm),'ringer_state_dir':str(self.runs.parent),'beads':{'host':socket.gethostname(),'store':'/ledger/main.db','claimant':'alice','issue_id':'bead-child','existing_ids':[]},'paperclip':{'issue_id':'pc-parent','existing_ids':[]},'ringside':{'base_url':'http://127.0.0.1:9999'},'bifrost':{'correlation':None},'tasks':[{'key':'alpha','work_type':'other','evidence':{'strength':'strong','kind':'objective'}}]};d.update(kw);self.m.write_text(json.dumps(d))
+ def cli(self,cmd,extra=(),env=None):
+  receipts={'prepare':self.prep,'execute':self.exe,'accept':self.done}; a=[sys.executable,str(TOOL),cmd,str(self.m),'--bd-bin',str(self.bd),'--ringer-bin',str(self.ringer),'--paperclip-bin',str(self.pc),'--ringside-bin',str(self.ringside),'--beads-host',socket.gethostname(),'--beads-store','/ledger/main.db','--beads-claimant','alice','--receipt',str(receipts[cmd])]
+  if cmd=='execute':a += ['--prepared-receipt',str(self.prep)]
+  if cmd=='accept':a += ['--prepared-receipt',str(self.prep),'--execute-receipt',str(self.exe)]
+  e=os.environ.copy();e.update({'CALL_LOG':str(self.log),'RUNS':str(self.runs),'TASKDIR':str(self.work/'alpha')});e.update(env or {})
+  return subprocess.run(a+list(extra),text=True,capture_output=True,env=e)
+ def calls(self):return [json.loads(x) for x in self.log.read_text().splitlines()] if self.log.exists() else []
+ def prepare_ok(self):
+  r=self.cli('prepare');self.assertEqual(0,r.returncode,r.stderr);self.log.unlink()
+ def execute_ok(self):
+  self.prepare_ok();r=self.cli('execute');self.assertEqual(0,r.returncode,r.stderr);self.log.unlink()
+ def test_prepare_accepts_array_and_posts_projection_only_after_lint_dryrun(self):
+  r=self.cli('prepare');self.assertEqual(0,r.returncode,r.stderr); c=self.calls(); lint=['ringer','lint',str(self.rm.resolve())];dry=['ringer','run',str(self.rm.resolve()),'--dry-run'];post=next(x for x in c if x[:2]==['paperclip','comment']);self.assertFalse(any(x[:2]==['bd','update'] for x in c));self.assertEqual(['bd','show','bead-child','--json'],c[0]);self.assertLess(c.index(lint),c.index(dry));self.assertLess(c.index(dry),c.index(post));self.assertEqual('prepared',json.loads(self.prep.read_text())['event'])
+ def test_prepare_requires_exact_claimant_and_status(self):
+  for env in ({'BD_ASSIGNEE':'bob'},{'BD_STATUS':'open'}):
+   r=self.cli('prepare',env=env);self.assertNotEqual(0,r.returncode);self.assertNotIn('ringer',[x[0] for x in self.calls()]);self.log.unlink()
+ def test_authority_host_store_mismatch_fails_before_commands(self):
+  for flag,value in (('--beads-host','other'),('--beads-store','/other')):
+   r=self.cli('prepare',(flag,value));self.assertNotEqual(0,r.returncode);self.assertFalse(self.log.exists())
+ def test_execute_rereads_claim_then_dispatches_and_binds_one_new_state(self):
+  self.prepare_ok();r=self.cli('execute');self.assertEqual(0,r.returncode,r.stderr);c=self.calls();show=next(i for i,x in enumerate(c) if x[:3]==['bd','show','bead-child']);dispatch=c.index(['ringer','run',str(self.rm.resolve())]);self.assertLess(show,dispatch);rec=json.loads(self.exe.read_text());self.assertEqual(hashlib.sha256((self.runs/'r1.json').read_bytes()).hexdigest(),rec['run_state_sha256'])
+ def test_execute_rejects_nonterminal_or_orphaned_and_ambiguous_receipts(self):
+  self.prepare_ok();r=self.cli('execute',env={'BD_STATUS':'open'});self.assertNotEqual(0,r.returncode);self.assertNotIn('ringer',[x[0] for x in self.calls()]);self.log.unlink()
+  (self.runs/'old.json').write_text('{}'); r=self.cli('execute',env={'BD_ASSIGNEE':''});self.assertNotEqual(0,r.returncode)
+ def test_accept_validates_real_state_without_top_level_verdict_and_replays_state_taskdir(self):
+  self.execute_ok();r=self.cli('accept');self.assertEqual(0,r.returncode,r.stderr);self.assertTrue(json.loads(self.done.read_text())['independent_replay']['alpha'])
+ def test_accept_rejects_bad_real_state_fields(self):
+  self.execute_ok();state=self.runs/'r1.json';d=json.loads(state.read_text());d['tasks'][0]['check_returncode']=1;state.write_text(json.dumps(d)); rec=json.loads(self.exe.read_text());rec['run_state_sha256']=hashlib.sha256(state.read_bytes()).hexdigest();self.exe.write_text(json.dumps(rec));r=self.cli('accept');self.assertNotEqual(0,r.returncode)
+ def test_beads_terminal_receipt_and_explicit_close_precede_paperclip_parent_projection(self):
+  self.execute_ok();r=self.cli('accept',('--accept-mode','close'));self.assertEqual(0,r.returncode,r.stderr);c=self.calls();rec=json.loads(self.done.read_text());reason=rec['beads_close_reason'];close_call=['bd','close','bead-child','--reason',reason,'--json'];close=c.index(close_call);comment=next(i for i,x in enumerate(c) if x[:4]==['bd','comments','add','bead-child']);readback=next(i for i,x in enumerate(c) if i>close and x[:3]==['bd','show','bead-child']);pc=next(i for i,x in enumerate(c) if x[:2]==['paperclip','comment']);self.assertEqual(f"Fleet Wave accepted: wave_id=wave; manifest_sha256={hashlib.sha256(self.m.read_bytes()).hexdigest()}; execute_receipt_sha256={hashlib.sha256(self.exe.read_bytes()).hexdigest()}",reason);self.assertLess(comment,close);self.assertLess(close,readback);self.assertLess(readback,pc);self.assertNotIn(['paperclip','close','pc-parent'],c)
+ def test_beads_failure_blocks_paperclip(self):
+  self.execute_ok();r=self.cli('accept',('--accept-mode','close'),{'BD_FAIL':'1'});self.assertNotEqual(0,r.returncode);self.assertNotIn('paperclip',[x[0] for x in self.calls()])
+ def test_ringside_is_read_only_and_bifrost_unproven(self):
+  self.execute_ok();r=self.cli('accept');self.assertEqual(0,r.returncode,r.stderr);c=self.calls();self.assertIn(['ringside','get','http://127.0.0.1:9999/api/runs'],c);self.assertIn(['ringside','get','http://127.0.0.1:9999/api/library'],c);self.assertFalse(any(x[0]=='ringside' and x[1]!='get' for x in c));self.assertIsNone(json.loads(self.done.read_text())['bifrost_correlation'])
+ def test_dict_empty_and_multi_beads_outputs(self):
+  self.assertEqual(0,self.cli('prepare',env={'BD_ARRAY':'-1'}).returncode);self.prep.unlink();self.log.unlink()
+  for n in ('0','2'):
+   self.assertNotEqual(0,self.cli('prepare',env={'BD_ARRAY':n}).returncode);self.log.unlink()
+ def test_existing_beads_ids_require_exact_single_item_and_id(self):
+  for env in ({'BD_ARRAY':'0','BD_ARRAY_ID':'old-bead'},{'BD_ARRAY':'2','BD_ARRAY_ID':'old-bead'},{'BD_WRONG_ID':'other','BD_WRONG_ID_TARGET':'old-bead'}):
+   self.write_manifest();d=json.loads(self.m.read_text());d['beads']['existing_ids']=['old-bead'];self.m.write_text(json.dumps(d));r=self.cli('prepare',env=env);self.assertNotEqual(0,r.returncode);self.assertFalse(self.prep.exists());self.log.unlink()
+ def test_manifest_supersession_is_exactly_previous_version_hash_path_and_wave(self):
+  prior=json.loads(self.m.read_text());h=hashlib.sha256(self.m.read_bytes()).hexdigest();v2=self.root/'manifest-v2.json';current=dict(prior,manifest_version=2,supersedes={'path':'manifest-v1.json','sha256':h});v2.write_text(json.dumps(current));old=self.m;self.m=v2
+  try:
+   r=self.cli('prepare');self.assertEqual(0,r.returncode,r.stderr);self.prep.unlink();self.log.unlink()
+   cases=[({'path':'manifest-v1.json','sha256':'0'*64},'wave',2),({'path':'other.json','sha256':h},'wave',2),({'path':'manifest-v1.json','sha256':h},'wave',3),({'path':'manifest-v1.json','sha256':h},'different',2)]
+   for sup,wave,version in cases:
+    name=self.root/f'manifest-v{version}.json';name.write_text(json.dumps(dict(current,manifest_version=version,wave_id=wave,supersedes=sup)));self.m=name;self.assertNotEqual(0,self.cli('prepare').returncode);self.assertFalse(self.log.exists())
+   self.m=old;self.m.write_text(json.dumps(dict(prior,supersedes={'path':'x','sha256':'0'*64})));self.assertNotEqual(0,self.cli('prepare').returncode);self.assertFalse(self.log.exists())
+  finally:self.m=old
+ def test_optional_task_strings_and_expected_files_are_nonempty(self):
+  for field,value in (('spec',''),('spec',' \t\n'),('check',''),('verified',''),('expect_files',['']),('expect_files',[' \n'])):
+   self.write_manifest();d=json.loads(self.m.read_text());d['tasks'][0][field]=value;self.m.write_text(json.dumps(d));self.assertNotEqual(0,self.cli('prepare').returncode);self.assertFalse(self.log.exists())
+ def test_actual_host_and_strict_manifest_shapes(self):
+  d=json.loads(self.m.read_text());d['beads']['host']='invented';self.m.write_text(json.dumps(d));self.assertNotEqual(0,self.cli('prepare',('--beads-host','invented')).returncode);self.assertFalse(self.log.exists())
+  for mutation in ('bifrost','extra','empty'):
+   self.write_manifest();d=json.loads(self.m.read_text())
+   if mutation=='bifrost':d['bifrost']['correlation']='claimed'
+   elif mutation=='extra':d['tasks'][0]['evidence']['extra']=1
+   else:d['wave_id']=''
+   self.m.write_text(json.dumps(d));self.assertNotEqual(0,self.cli('prepare').returncode);self.assertFalse(self.log.exists())
+ def test_execute_rejects_zero_two_and_overwrite(self):
+  for mode in ('none','two','overwrite'):
+   self.prepare_ok()
+   if mode=='overwrite':(self.runs/'old.json').write_text('{}')
+   self.assertNotEqual(0,self.cli('execute',env={'STATE_MODE':mode}).returncode);self.assertFalse(self.exe.exists())
+   for x in self.runs.glob('*.json'):x.unlink()
+ def test_ringside_failure_precedes_all_terminal_writes(self):
+  self.execute_ok();r=self.cli('accept',env={'RINGSIDE_FAIL':'1'});self.assertNotEqual(0,r.returncode);c=self.calls();self.assertFalse(any(x[0]=='paperclip' or x[0]=='bd' and any(y in x for y in ('comments','close')) for x in c));self.assertFalse(self.done.exists())
+ def test_finished_totals_and_taskdir_containment(self):
+  self.execute_ok();state=self.runs/'r1.json';d=json.loads(state.read_text());d['totals']['running']=1;state.write_text(json.dumps(d));rec=json.loads(self.exe.read_text());rec['run_state_sha256']=hashlib.sha256(state.read_bytes()).hexdigest();self.exe.write_text(json.dumps(rec));self.assertNotEqual(0,self.cli('accept').returncode)
+ def test_judge_binds_execution_state_and_exact_shape(self):
+  d=json.loads(self.m.read_text());d['tasks'][0]['evidence']['kind']='judgmental';self.m.write_text(json.dumps(d));self.execute_ok();ex=json.loads(self.exe.read_text());j=self.root/'judge.json';att={'judge_id':'independent-judge','judged_at':'2999-01-01T00:00:00Z','criteria':['artifact is sufficient'],'rationale':'The replayed artifact satisfies the criterion.','task_keys':['alpha'],'independent':True,'verdict':'PASS','wave_id':'wave','manifest_sha256':hashlib.sha256(self.m.read_bytes()).hexdigest(),'execute_receipt_sha256':hashlib.sha256(self.exe.read_bytes()).hexdigest(),'run_state_sha256':ex['run_state_sha256']};j.write_text(json.dumps(att));r=self.cli('accept',('--judge-receipt',str(j)));self.assertEqual(0,r.returncode,r.stderr);self.assertEqual(hashlib.sha256(j.read_bytes()).hexdigest(),json.loads(self.done.read_text())['judge_receipt_sha256']);self.done.unlink();self.log.unlink();att['execute_receipt_sha256']='0'*64;j.write_text(json.dumps(att));self.assertNotEqual(0,self.cli('accept',('--judge-receipt',str(j))).returncode);self.assertFalse(self.log.exists())
+ def test_prepared_receipt_is_exact_typed_authorization(self):
+  self.prepare_ok();original=json.loads(self.prep.read_text())
+  mutations=[('extra',dict(original,extra=1)),('authorization',dict(original,dispatch_authorized=1)),('event',dict(original,event='executed')),('naive-time',dict(original,prepared_at='2026-01-01T00:00:00')),('bad-hash',dict(original,manifest_sha256=7)),('authority',dict(original,beads_authority=dict(original['beads_authority'],claimant='mallory')))]
+  for name,value in mutations:
+   self.prep.write_text(json.dumps(value));r=self.cli('execute');self.assertNotEqual(0,r.returncode,name);self.assertFalse(self.log.exists(),name);self.prep.write_text(json.dumps(original))
+ def test_execute_receipt_is_exact_typed_and_bound(self):
+  self.execute_ok();original=json.loads(self.exe.read_text())
+  mutations=[('extra',dict(original,extra=1)),('naive-time',dict(original,executed_at='2026-01-01T00:00:00')),('path-type',dict(original,run_state_path=7)),('hash-type',dict(original,run_state_sha256=True)),('prepared-hash',dict(original,prepared_receipt_sha256='0'*64))]
+  for name,value in mutations:
+   self.exe.write_text(json.dumps(value));r=self.cli('accept');self.assertNotEqual(0,r.returncode,name);self.assertFalse(self.log.exists(),name);self.exe.write_text(json.dumps(original))
+ def test_accept_rejects_run_state_outside_bound_runs_and_path_substitution(self):
+  self.execute_ok();original=json.loads(self.exe.read_text());outside=self.root/'outside.json';outside.write_bytes((self.runs/'r1.json').read_bytes())
+  for candidate in (outside,self.runs/'..'/'outside.json'):
+   rec=dict(original,run_state_path=str(candidate),run_state_sha256=hashlib.sha256(outside.read_bytes()).hexdigest());self.exe.write_text(json.dumps(rec));r=self.cli('accept');self.assertNotEqual(0,r.returncode);self.assertFalse(self.log.exists())
+ def test_controller_enforces_cross_field_issue_ids_and_duplicate_task_keys(self):
+  for surface in ('beads','paperclip'):
+   self.write_manifest();d=json.loads(self.m.read_text());d[surface]['existing_ids']=[d[surface]['issue_id']];self.m.write_text(json.dumps(d));self.assertNotEqual(0,self.cli('prepare').returncode);self.assertFalse(self.log.exists())
+  self.write_manifest();d=json.loads(self.m.read_text());d['tasks'].append(dict(d['tasks'][0]));self.m.write_text(json.dumps(d));self.assertNotEqual(0,self.cli('prepare').returncode);self.assertFalse(self.log.exists())
+ def test_schema_documents_semantics_and_rejects_whitespace_strings(self):
+  schema=json.loads((ROOT/'schema/fleet-wave.v1.json').read_text());text=json.dumps(schema)
+  self.assertIn('controller-enforced',text);self.assertIn('duplicate task',text);self.assertIn('issue_id',text)
+  def walk(value):
+   if isinstance(value,dict):
+    if value.get('type')=='string' and value.get('minLength')==1:self.assertEqual(r'\S',value.get('pattern'))
+    for child in value.values():walk(child)
+   elif isinstance(value,list):
+    for child in value:walk(child)
+  walk(schema)
+if __name__=='__main__':unittest.main()
