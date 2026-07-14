@@ -5,7 +5,7 @@
   "$comment": "Standard JSON Schema cannot express all controller-enforced semantic constraints: each issue_id must be absent from its sibling existing_ids array, and duplicate task keys are forbidden across tasks. tools/fleet_wave.py enforces both constraints fail-closed.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "manifest_version", "wave_id", "supersedes", "ringer_manifest", "ringer_state_dir", "beads", "tasks"],
+  "required": ["schema_version", "manifest_version", "wave_id", "attempt_id", "supersedes", "ringer_manifest", "ringer_state_dir", "beads", "tasks"],
   "allOf": [{
     "if": {"properties": {"manifest_version": {"const": 1}}, "required": ["manifest_version"]},
     "then": {"properties": {"supersedes": {"type": "null"}}},
@@ -15,6 +15,7 @@
     "schema_version": {"const": "fleet-wave.v1"},
     "manifest_version": {"type": "integer", "minimum": 1},
     "wave_id": {"type": "string", "minLength": 1, "pattern": "\\S"},
+    "attempt_id": {"type": "string", "minLength": 1, "pattern": "\\S", "description": "Immutable attempt boundary; retries require a new value."},
     "supersedes": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/supersedes"}]},
     "run_name": {"type": "string", "minLength": 1, "pattern": "\\S"},
     "workdir": {"type": "string", "minLength": 1, "pattern": "\\S"},
@@ -31,6 +32,6 @@
     "supersedes": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"type": "string", "minLength": 1, "pattern": "\\S"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}},
     "ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "pattern": "\\S"}},
     "issueSurface": {"description": "Issue authority surface. Controller-enforced semantic constraint: issue_id must not occur in existing_ids.", "type": "object", "additionalProperties": false, "required": ["issue_id", "existing_ids"], "properties": {"issue_id": {"type": "string", "minLength": 1, "pattern": "\\S"}, "existing_ids": {"$ref": "#/$defs/ids"}}},
-    "task": {"description": "Task declaration. Controller-enforced semantic constraint: every task key must be unique across the tasks array; standard JSON Schema uniqueItems cannot compare one property across objects.", "type": "object", "additionalProperties": false, "required": ["key", "work_type", "evidence"], "properties": {"key": {"type": "string", "minLength": 1, "pattern": "\\S"}, "work_type": {"enum": ["code", "deployment", "config", "factual-research", "other"]}, "spec": {"type": "string", "minLength": 1, "pattern": "\\S"}, "check": {"type": "string", "minLength": 1, "pattern": "\\S"}, "expect_files": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "pattern": "\\S"}}, "verified": {"type": "string", "minLength": 1, "pattern": "\\S"}, "evidence": {"type": "object", "additionalProperties": false, "required": ["strength", "kind"], "properties": {"strength": {"const": "strong"}, "kind": {"enum": ["objective", "judgmental"]}}}}}
+    "task": {"description": "Task declaration. All work types, including other, require a criterion-specific strong check and negative controls. true, exit 0, and existence-only tests are controller-rejected.", "type": "object", "additionalProperties": false, "required": ["key", "work_type", "check", "negative_controls", "evidence"], "properties": {"key": {"type": "string", "minLength": 1, "pattern": "\\S"}, "work_type": {"enum": ["code", "deployment", "config", "factual-research", "other"]}, "spec": {"type": "string", "minLength": 1, "pattern": "\\S"}, "check": {"type": "string", "minLength": 1, "pattern": "\\S"}, "negative_controls": {"type":"array","minItems":2,"items":{"type":"object","additionalProperties":false,"required":["name","setup"],"properties":{"name":{"type":"string","minLength":1,"pattern":"\\S"},"setup":{"type":"string","minLength":1,"pattern":"\\S"}}} }, "expect_files": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "pattern": "\\S"}}, "verified": {"type": "string", "minLength": 1, "pattern": "\\S"}, "evidence": {"type": "object", "additionalProperties": false, "required": ["strength", "kind"], "properties": {"strength": {"const": "strong"}, "kind": {"enum": ["objective", "judgmental"]}}}}}
   }
 }

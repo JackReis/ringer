@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import hashlib, json, os, socket, subprocess, sys, tempfile, unittest
+import hashlib, hmac, json, os, socket, subprocess, sys, tempfile, unittest
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]; TOOL=ROOT/'tools/fleet_wave.py'
 def executable(path, body):
@@ -16,9 +16,9 @@ marker=os.environ['CALL_LOG']+'.closed'
 if os.environ.get('BD_FAIL')=='1' and 'close' in sys.argv:raise SystemExit(9)
 if 'close' in sys.argv:open(marker,'w').close()
 status='closed' if os.path.exists(marker) else os.environ.get('BD_STATUS','in_progress')
-requested=sys.argv[2] if len(sys.argv)>2 else 'x'
+requested=sys.argv[3] if sys.argv[1:3]==['claim','acquire'] else (sys.argv[2] if len(sys.argv)>2 else 'x')
 item_id=os.environ.get('BD_WRONG_ID',requested) if requested==os.environ.get('BD_WRONG_ID_TARGET',requested) else requested
-item={'id':item_id,'status':status,'assignee':os.environ.get('BD_ASSIGNEE','alice')}
+item={'id':item_id,'status':status,'assignee':os.environ.get('BD_ASSIGNEE','alice'),'authority_host':os.uname().nodename,'store_locator':'/ledger/main.db','claim_id':os.environ.get('BD_CLAIM_ID','claim-live-1'),'attempt_id':'attempt-1','issue_version':'7','reservation':'acquired','lease_expires_at':os.environ.get('BD_LEASE','2999-01-01T00:00:00Z'),'capabilities':['dispatch'],'concurrency':{'active':int(os.environ.get('BD_ACTIVE','0')),'limit':1}}
 n=int(os.environ.get('BD_ARRAY','1')) if requested==os.environ.get('BD_ARRAY_ID',requested) else 1
 print(json.dumps(item if n==-1 else [item]*n))
 """)
@@ -34,18 +34,21 @@ if sys.argv[1]=='run' and '--dry-run' not in sys.argv:
 """)
   self.pc=executable(self.root/'paperclip',"""import json,os,sys
 with open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps(['paperclip',*sys.argv[1:]])+'\\n')
-if len(sys.argv)>2 and sys.argv[1]=='show':print(json.dumps({'id':sys.argv[2]}))
+if len(sys.argv)>2 and sys.argv[1]=='show':print(json.dumps({'id':'canonical-'+sys.argv[2],'identifier':sys.argv[2]}))
+elif len(sys.argv)>3 and sys.argv[1]=='comment':
+ import hashlib
+ print(json.dumps({'issue_id':sys.argv[2],'payload_sha256':hashlib.sha256(sys.argv[3].encode()).hexdigest(),'comment_id':'c1'}))
 """)
   self.ringside=executable(self.root/'ringside',"""import json,os,sys
 with open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps(['ringside',*sys.argv[1:]])+'\\n')
 if os.environ.get('RINGSIDE_FAIL')=='1':raise SystemExit(8)
-print(json.dumps({'runs':[]} if sys.argv[-1].endswith('/api/runs') else {'artifacts':[]}))
+print(json.dumps({'runs':[{'run_id':'r1'}]} if sys.argv[-1].endswith('/api/runs') else {'artifacts':[{'metadata':{'run_id':'r1'}}]}))
 """)
-  self.rm=self.root/'ringer.json'; self.rm.write_text(json.dumps({'workdir':str(self.work),'tasks':[{'key':'alpha','check':'test -s proof.txt','expect_files':['proof.txt']}]}))
+  self.rm=self.root/'ringer.json'; self.rm.write_text(json.dumps({'workdir':str(self.work),'tasks':[{'key':'alpha','check':'test -s proof.txt && grep -q proof proof.txt','expect_files':['proof.txt']}]}))
   self.m=self.root/'manifest-v1.json'; self.write_manifest(); self.prep=self.root/'prepared.json'; self.exe=self.root/'executed.json'; self.done=self.root/'done.json'
  def tearDown(self):self.t.cleanup()
  def write_manifest(self,**kw):
-  d={'schema_version':'fleet-wave.v1','manifest_version':1,'wave_id':'wave','supersedes':None,'ringer_manifest':str(self.rm),'ringer_state_dir':str(self.runs.parent),'beads':{'host':socket.gethostname(),'store':'/ledger/main.db','claimant':'alice','issue_id':'bead-child','existing_ids':[]},'paperclip':{'issue_id':'pc-parent','existing_ids':[]},'ringside':{'base_url':'http://127.0.0.1:9999'},'bifrost':{'correlation':None},'tasks':[{'key':'alpha','work_type':'other','evidence':{'strength':'strong','kind':'objective'}}]};d.update(kw);self.m.write_text(json.dumps(d))
+  d={'schema_version':'fleet-wave.v1','manifest_version':1,'wave_id':'wave','attempt_id':'attempt-1','supersedes':None,'ringer_manifest':str(self.rm),'ringer_state_dir':str(self.runs.parent),'beads':{'host':socket.gethostname(),'store':'/ledger/main.db','claimant':'alice','issue_id':'bead-child','existing_ids':[]},'paperclip':{'issue_id':'pc-parent','existing_ids':[]},'ringside':{'base_url':'http://127.0.0.1:9999'},'bifrost':{'correlation':None},'tasks':[{'key':'alpha','work_type':'other','check':'test -s proof.txt && grep -q proof proof.txt','negative_controls':[{'name':'missing artifact','setup':'rm -f proof.txt'},{'name':'wrong content','setup':"printf 'wrong\\n' > proof.txt"}],'evidence':{'strength':'strong','kind':'objective'}}]};d.update(kw);self.m.write_text(json.dumps(d))
  def cli(self,cmd,extra=(),env=None):
   receipts={'prepare':self.prep,'execute':self.exe,'accept':self.done}; a=[sys.executable,str(TOOL),cmd,str(self.m),'--bd-bin',str(self.bd),'--ringer-bin',str(self.ringer),'--paperclip-bin',str(self.pc),'--ringside-bin',str(self.ringside),'--beads-host',socket.gethostname(),'--beads-store','/ledger/main.db','--beads-claimant','alice','--receipt',str(receipts[cmd])]
   if cmd=='execute':a += ['--prepared-receipt',str(self.prep)]
@@ -58,7 +61,7 @@ print(json.dumps({'runs':[]} if sys.argv[-1].endswith('/api/runs') else {'artifa
  def execute_ok(self):
   self.prepare_ok();r=self.cli('execute');self.assertEqual(0,r.returncode,r.stderr);self.log.unlink()
  def test_prepare_accepts_array_and_posts_projection_only_after_lint_dryrun(self):
-  r=self.cli('prepare');self.assertEqual(0,r.returncode,r.stderr); c=self.calls(); lint=['ringer','lint',str(self.rm.resolve())];dry=['ringer','run',str(self.rm.resolve()),'--dry-run'];post=next(x for x in c if x[:2]==['paperclip','comment']);self.assertFalse(any(x[:2]==['bd','update'] for x in c));self.assertEqual(['bd','show','bead-child','--json'],c[0]);self.assertLess(c.index(lint),c.index(dry));self.assertLess(c.index(dry),c.index(post));self.assertEqual('prepared',json.loads(self.prep.read_text())['event'])
+  r=self.cli('prepare');self.assertEqual(0,r.returncode,r.stderr); c=self.calls(); lint=['ringer','lint',str(self.rm.resolve())];dry=['ringer','run',str(self.rm.resolve()),'--dry-run'];post=next(x for x in c if x[:2]==['paperclip','comment']);self.assertFalse(any(x[:2]==['bd','update'] for x in c));self.assertEqual(['bd','claim','acquire','bead-child'],c[0][:4]);self.assertLess(c.index(lint),c.index(dry));self.assertLess(c.index(dry),c.index(post));self.assertEqual('prepared',json.loads(self.prep.read_text())['event'])
  def test_prepare_requires_exact_claimant_and_status(self):
   for env in ({'BD_ASSIGNEE':'bob'},{'BD_STATUS':'open'}):
    r=self.cli('prepare',env=env);self.assertNotEqual(0,r.returncode);self.assertNotIn('ringer',[x[0] for x in self.calls()]);self.log.unlink()
@@ -66,7 +69,7 @@ print(json.dumps({'runs':[]} if sys.argv[-1].endswith('/api/runs') else {'artifa
   for flag,value in (('--beads-host','other'),('--beads-store','/other')):
    r=self.cli('prepare',(flag,value));self.assertNotEqual(0,r.returncode);self.assertFalse(self.log.exists())
  def test_execute_rereads_claim_then_dispatches_and_binds_one_new_state(self):
-  self.prepare_ok();r=self.cli('execute');self.assertEqual(0,r.returncode,r.stderr);c=self.calls();show=next(i for i,x in enumerate(c) if x[:3]==['bd','show','bead-child']);dispatch=c.index(['ringer','run',str(self.rm.resolve())]);self.assertLess(show,dispatch);rec=json.loads(self.exe.read_text());self.assertEqual(hashlib.sha256((self.runs/'r1.json').read_bytes()).hexdigest(),rec['run_state_sha256'])
+  self.prepare_ok();r=self.cli('execute');self.assertEqual(0,r.returncode,r.stderr);c=self.calls();cas=next(i for i,x in enumerate(c) if x[1:3]==['claim','acquire']);dispatch=c.index(['ringer','run',str(self.rm.resolve())]);self.assertLess(cas,dispatch);rec=json.loads(self.exe.read_text());self.assertEqual(hashlib.sha256((self.runs/'r1.json').read_bytes()).hexdigest(),rec['run_state_sha256'])
  def test_execute_rejects_nonterminal_or_orphaned_and_ambiguous_receipts(self):
   self.prepare_ok();r=self.cli('execute',env={'BD_STATUS':'open'});self.assertNotEqual(0,r.returncode);self.assertNotIn('ringer',[x[0] for x in self.calls()]);self.log.unlink()
   (self.runs/'old.json').write_text('{}'); r=self.cli('execute',env={'BD_ASSIGNEE':''});self.assertNotEqual(0,r.returncode)
@@ -75,9 +78,9 @@ print(json.dumps({'runs':[]} if sys.argv[-1].endswith('/api/runs') else {'artifa
  def test_accept_rejects_bad_real_state_fields(self):
   self.execute_ok();state=self.runs/'r1.json';d=json.loads(state.read_text());d['tasks'][0]['check_returncode']=1;state.write_text(json.dumps(d)); rec=json.loads(self.exe.read_text());rec['run_state_sha256']=hashlib.sha256(state.read_bytes()).hexdigest();self.exe.write_text(json.dumps(rec));r=self.cli('accept');self.assertNotEqual(0,r.returncode)
  def test_beads_terminal_receipt_and_explicit_close_precede_paperclip_parent_projection(self):
-  self.execute_ok();r=self.cli('accept',('--accept-mode','close'));self.assertEqual(0,r.returncode,r.stderr);c=self.calls();rec=json.loads(self.done.read_text());reason=rec['beads_close_reason'];close_call=['bd','close','bead-child','--reason',reason,'--json'];close=c.index(close_call);comment=next(i for i,x in enumerate(c) if x[:4]==['bd','comments','add','bead-child']);readback=next(i for i,x in enumerate(c) if i>close and x[:3]==['bd','show','bead-child']);pc=next(i for i,x in enumerate(c) if x[:2]==['paperclip','comment']);self.assertEqual(f"Fleet Wave accepted: wave_id=wave; manifest_sha256={hashlib.sha256(self.m.read_bytes()).hexdigest()}; execute_receipt_sha256={hashlib.sha256(self.exe.read_bytes()).hexdigest()}",reason);self.assertLess(comment,close);self.assertLess(close,readback);self.assertLess(readback,pc);self.assertNotIn(['paperclip','close','pc-parent'],c)
+  self.execute_ok();r=self.cli('accept');self.assertEqual(0,r.returncode,r.stderr);c=self.calls();rec=json.loads(self.done.read_text());reason=rec['beads_close_reason'];close_call=['bd','close','bead-child','--reason',reason,'--json'];close=c.index(close_call);comment=next(i for i,x in enumerate(c) if x[:4]==['bd','comments','add','bead-child']);readback=next(i for i,x in enumerate(c) if i>close and x[:3]==['bd','show','bead-child']);pc=next(i for i,x in enumerate(c) if x[:2]==['paperclip','comment']);self.assertLess(comment,close);self.assertLess(close,readback);self.assertLess(readback,pc)
  def test_beads_failure_blocks_paperclip(self):
-  self.execute_ok();r=self.cli('accept',('--accept-mode','close'),{'BD_FAIL':'1'});self.assertNotEqual(0,r.returncode);self.assertNotIn('paperclip',[x[0] for x in self.calls()])
+  self.execute_ok();r=self.cli('accept',env={'BD_FAIL':'1'});self.assertNotEqual(0,r.returncode);self.assertNotIn('paperclip',[x[0] for x in self.calls()])
  def test_ringside_is_read_only_and_bifrost_unproven(self):
   self.execute_ok();r=self.cli('accept');self.assertEqual(0,r.returncode,r.stderr);c=self.calls();self.assertIn(['ringside','get','http://127.0.0.1:9999/api/runs'],c);self.assertIn(['ringside','get','http://127.0.0.1:9999/api/library'],c);self.assertFalse(any(x[0]=='ringside' and x[1]!='get' for x in c));self.assertIsNone(json.loads(self.done.read_text())['bifrost_correlation'])
  def test_dict_empty_and_multi_beads_outputs(self):
@@ -109,16 +112,17 @@ print(json.dumps({'runs':[]} if sys.argv[-1].endswith('/api/runs') else {'artifa
    self.m.write_text(json.dumps(d));self.assertNotEqual(0,self.cli('prepare').returncode);self.assertFalse(self.log.exists())
  def test_execute_rejects_zero_two_and_overwrite(self):
   for mode in ('none','two','overwrite'):
+   if self.prep.exists():self.prep.unlink()
    self.prepare_ok()
    if mode=='overwrite':(self.runs/'old.json').write_text('{}')
    self.assertNotEqual(0,self.cli('execute',env={'STATE_MODE':mode}).returncode);self.assertFalse(self.exe.exists())
    for x in self.runs.glob('*.json'):x.unlink()
- def test_ringside_failure_precedes_all_terminal_writes(self):
-  self.execute_ok();r=self.cli('accept',env={'RINGSIDE_FAIL':'1'});self.assertNotEqual(0,r.returncode);c=self.calls();self.assertFalse(any(x[0]=='paperclip' or x[0]=='bd' and any(y in x for y in ('comments','close')) for x in c));self.assertFalse(self.done.exists())
+ def test_ringside_failure_is_degraded_after_terminal_truth(self):
+  self.execute_ok();r=self.cli('accept',env={'RINGSIDE_FAIL':'1'});self.assertNotEqual(0,r.returncode);c=self.calls();self.assertTrue(any(x[0]=='paperclip' for x in c));self.assertTrue(any(x[0]=='bd' and 'comments' in x for x in c));self.assertTrue(self.done.exists());self.assertTrue(Path(str(self.done)+'.ringside-projection-degraded.json').exists())
  def test_finished_totals_and_taskdir_containment(self):
   self.execute_ok();state=self.runs/'r1.json';d=json.loads(state.read_text());d['totals']['running']=1;state.write_text(json.dumps(d));rec=json.loads(self.exe.read_text());rec['run_state_sha256']=hashlib.sha256(state.read_bytes()).hexdigest();self.exe.write_text(json.dumps(rec));self.assertNotEqual(0,self.cli('accept').returncode)
  def test_judge_binds_execution_state_and_exact_shape(self):
-  d=json.loads(self.m.read_text());d['tasks'][0]['evidence']['kind']='judgmental';self.m.write_text(json.dumps(d));self.execute_ok();ex=json.loads(self.exe.read_text());j=self.root/'judge.json';att={'judge_id':'independent-judge','judged_at':'2999-01-01T00:00:00Z','criteria':['artifact is sufficient'],'rationale':'The replayed artifact satisfies the criterion.','task_keys':['alpha'],'independent':True,'verdict':'PASS','wave_id':'wave','manifest_sha256':hashlib.sha256(self.m.read_bytes()).hexdigest(),'execute_receipt_sha256':hashlib.sha256(self.exe.read_bytes()).hexdigest(),'run_state_sha256':ex['run_state_sha256']};j.write_text(json.dumps(att));r=self.cli('accept',('--judge-receipt',str(j)));self.assertEqual(0,r.returncode,r.stderr);self.assertEqual(hashlib.sha256(j.read_bytes()).hexdigest(),json.loads(self.done.read_text())['judge_receipt_sha256']);self.done.unlink();self.log.unlink();att['execute_receipt_sha256']='0'*64;j.write_text(json.dumps(att));self.assertNotEqual(0,self.cli('accept',('--judge-receipt',str(j))).returncode);self.assertFalse(self.log.exists())
+  d=json.loads(self.m.read_text());d['tasks'][0]['evidence']['kind']='judgmental';self.m.write_text(json.dumps(d));self.execute_ok();ex=json.loads(self.exe.read_text());j=self.root/'judge.json';att={'judge_id':'independent-judge','session_id':'fresh-session','model':'judge-model','harness_attestation':{'attestation_id':'att-1','provider':'test-harness','session_id':'fresh-session','judge_id':'independent-judge','issuer':'trusted-test'},'new_session':True,'resumed':False,'role_history':['judge'],'evidence_fetched_at':'2998-01-01T00:00:00Z','judged_at':'2999-01-01T00:00:00Z','criteria':['artifact is sufficient'],'rationale':'The replayed artifact satisfies the criterion.','task_keys':['alpha'],'independent':True,'verdict':'PASS','wave_id':'wave','manifest_sha256':hashlib.sha256(self.m.read_bytes()).hexdigest(),'execute_receipt_sha256':hashlib.sha256(self.exe.read_bytes()).hexdigest(),'run_state_sha256':ex['run_state_sha256']};att['harness_attestation']['signature']=hmac.new(b'secret',json.dumps(att,sort_keys=True,separators=(',',':')).encode(),hashlib.sha256).hexdigest();j.write_text(json.dumps(att));r=self.cli('accept',('--judge-receipt',str(j)),{'FLEET_JUDGE_ATTESTATION_SECRET':'secret'});self.assertEqual(0,r.returncode,r.stderr);self.assertEqual(hashlib.sha256(j.read_bytes()).hexdigest(),json.loads(self.done.read_text())['judge_receipt_sha256']);self.done.unlink();self.log.unlink();att['execute_receipt_sha256']='0'*64;j.write_text(json.dumps(att));self.assertNotEqual(0,self.cli('accept',('--judge-receipt',str(j)),{'FLEET_JUDGE_ATTESTATION_SECRET':'secret'}).returncode);self.assertFalse(self.log.exists())
  def test_prepared_receipt_is_exact_typed_authorization(self):
   self.prepare_ok();original=json.loads(self.prep.read_text())
   mutations=[('extra',dict(original,extra=1)),('authorization',dict(original,dispatch_authorized=1)),('event',dict(original,event='executed')),('naive-time',dict(original,prepared_at='2026-01-01T00:00:00')),('bad-hash',dict(original,manifest_sha256=7)),('authority',dict(original,beads_authority=dict(original['beads_authority'],claimant='mallory')))]
@@ -147,4 +151,26 @@ print(json.dumps({'runs':[]} if sys.argv[-1].endswith('/api/runs') else {'artifa
    elif isinstance(value,list):
     for child in value:walk(child)
   walk(schema)
+ def test_paperclip_identifier_or_canonical_id_is_preserved(self):
+  r=self.cli('prepare');self.assertEqual(0,r.returncode,r.stderr)
+  identities=json.loads(self.prep.read_text())['stage_extension']['paperclip_readbacks']
+  self.assertEqual({'requested':'pc-parent','identifier':'pc-parent','canonical_id':'canonical-pc-parent'},identities[0])
+ def test_other_cannot_bypass_strong_check(self):
+  for check in ('true','exit 0','test -s proof.txt'):
+   self.write_manifest();d=json.loads(self.m.read_text());d['tasks'][0]['check']=check;self.m.write_text(json.dumps(d))
+   self.assertNotEqual(0,self.cli('prepare').returncode);self.assertFalse(self.log.exists())
+ def test_live_claim_proof_is_mandatory_and_bound(self):
+  for env in ({'BD_CLAIM_ID':''},{'BD_LEASE':'2000-01-01T00:00:00Z'},{'BD_ACTIVE':'1'}):
+   r=self.cli('prepare',env=env);self.assertNotEqual(0,r.returncode);self.assertEqual('UNKNOWN_DEGRADED',json.loads(self.prep.read_text())['stage_extension']['claim_state']);self.assertNotIn('ringer',[x[0] for x in self.calls()]);self.prep.unlink();self.log.unlink()
+ def test_transition_chain_e3_e4_and_receipted_disposition(self):
+  self.execute_ok();r=self.cli('accept');self.assertEqual(0,r.returncode,r.stderr);rec=json.loads(self.done.read_text());self.assertEqual('accepted',rec['authoritative_disposition']);self.assertEqual('BEADS ACCEPTED',rec['transition']['to']);self.assertIn('stdout_sha256',rec['check_execution']['alpha']);self.assertTrue(rec['clean_replay']['alpha']['isolated_copy']);self.assertEqual(2,len(rec['clean_replay']['alpha']['negative_controls']));self.assertEqual(['INTAKE','LEDGERED','CLAIMED','MANIFEST-v1','LINTED','DRY-RUN','PAPERCLIP PREPARED RECEIPT','RINGER RUN','INDEPENDENT CHECK REPLAY','BEADS ACCEPTED'],[x['transition'] for x in rec['transitions']])
+ def test_structured_negative_controls_reject_wrapped_noop(self):
+  d=json.loads(self.m.read_text());d['tasks'][0]['check']='sh -c true';self.m.write_text(json.dumps(d));rd=json.loads(self.rm.read_text());rd['tasks'][0]['check']='sh -c true';self.rm.write_text(json.dumps(rd));self.execute_ok();r=self.cli('accept');self.assertNotEqual(0,r.returncode);self.assertFalse(self.done.exists());self.assertFalse(any(x[0]=='bd' for x in self.calls()))
+ def test_empty_run_id_cannot_match_null(self):
+  self.execute_ok();state=self.runs/'r1.json';d=json.loads(state.read_text());d['run_id']='';state.write_text(json.dumps(d));rec=json.loads(self.exe.read_text());rec['run_state_sha256']=hashlib.sha256(state.read_bytes()).hexdigest();self.exe.write_text(json.dumps(rec));self.assertNotEqual(0,self.cli('accept').returncode)
+ def test_judge_empty_harness_is_rejected(self):
+  d=json.loads(self.m.read_text());d['tasks'][0]['evidence']['kind']='judgmental';self.m.write_text(json.dumps(d));self.execute_ok();j=self.root/'judge.json';j.write_text('{}');self.assertNotEqual(0,self.cli('accept',('--judge-receipt',str(j))).returncode)
+ def test_manifest_and_receipts_bind_attempt_and_chain(self):
+  self.prepare_ok();p=json.loads(self.prep.read_text());self.assertEqual('attempt-1',p['attempt_id']);self.assertIn('authority',p);self.assertIn('integrity',p)
+  r=self.cli('execute');self.assertEqual(0,r.returncode,r.stderr);e=json.loads(self.exe.read_text());self.assertEqual(p['receipt_id'],e['predecessor']['receipt_id']);self.assertEqual(hashlib.sha256(self.prep.read_bytes()).hexdigest(),e['predecessor']['digest'])
 if __name__=='__main__':unittest.main()

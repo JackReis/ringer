@@ -1,36 +1,44 @@
 # Fleet Wave protocol v1
 
-`tools/fleet_wave.py` is a stdlib-only, fail-closed controller. Beads is work authority, Ringer owns execution evidence, Paperclip is visibility, Ringside is read-only, and Bifrost remains `null` unless genuine correlation evidence is added in a future protocol.
+`tools/fleet_wave.py` is a stdlib-only, fail-closed controller implementing the active Fleet Wave authority order. Beads is sole work/disposition authority; Paperclip is a one-way projection; Ringer executes; Ringside performs GET-only observation; Bifrost remains unproven/null.
 
-## Bound manifest
+## Manifest and strong checks
 
-Use `templates/fleet-wave/manifest-v1.json` and `schema/fleet-wave.v1.json`. Every schema string declared non-empty requires at least one non-whitespace character. Standard JSON Schema cannot compare `issue_id` against `existing_ids` or compare task `key` properties across task objects; the schema documents these semantic constraints and the controller enforces them fail-closed (issue IDs cannot be repeated in `existing_ids`, and duplicate task keys are rejected). The filename is exactly `manifest-vN.json`. Version N>1 uses `supersedes: {"path": "manifest-vN-1.json", "sha256": "..."}`. The manifest binds the Beads authority `host`, `store`, `claimant`, and child `issue_id`; CLI authority arguments must exactly match, `host` must equal the controller's `socket.gethostname()`, and every `bd` process receives the bound store as `BEADS_DIR`. Paperclip may identify an open parent while the child Bead closes.
+Start from `templates/fleet-wave/manifest-v1.json`; validate against `schema/fleet-wave.v1.json`. The immutable manifest binds the full Beads tuple (`issue_id`, host, store, claimant), unique `attempt_id`, version/digest, Ringer manifest/state directory, and tasks. Retries use a new attempt. Supersession uses the immediately preceding immutable manifest path/digest.
 
-## Transitions
+Every work type—including `other`—requires a criterion-specific `check` and at least two structured executable negative controls (`name` plus fixture-mutating `setup`). Execute creates an immutable content-addressed inventory/snapshot. Acceptance launches `replay-one` as a distinct checker subprocess with a minimal environment, validates the snapshot digest, and never reruns against the mutable worker directory. Every negative fixture is derived from that snapshot and must make the same check exit nonzero. This rejects `true`, `exit 0`, wrappers, and test-only/existence-only checks; expected-file existence is only an artifact precondition.
 
-All executable paths and authority values are explicit. Tests use fakes; never point tests at live ledgers.
+Paperclip readback accepts the requested key only when it equals returned `identifier` or canonical `id`; both values are retained in the prepared receipt. Beads readback remains exact for ID, status, claimant, host and store.
+
+## Commands and state order
 
 ```sh
-python3 tools/fleet_wave.py prepare manifest-v1.json \
- --bd-bin /path/bd --ringer-bin /path/ringer --paperclip-bin /path/paperclip \
- --ringside-bin /path/read-only-client --beads-host HOST --beads-store STORE \
- --beads-claimant USER --receipt prepared.json
-
-python3 tools/fleet_wave.py execute manifest-v1.json \
- --bd-bin /path/bd --ringer-bin /path/ringer --beads-host HOST --beads-store STORE \
- --beads-claimant USER --prepared-receipt prepared.json --receipt executed.json
-
-python3 tools/fleet_wave.py accept manifest-v1.json \
- --bd-bin /path/bd --ringer-bin /path/ringer --paperclip-bin /path/paperclip \
- --ringside-bin /path/read-only-client --beads-host HOST --beads-store STORE \
- --beads-claimant USER --prepared-receipt prepared.json --execute-receipt executed.json \
- --accept-mode close --receipt accepted.json
+python3 tools/fleet_wave.py prepare manifest-v1.json --bd-bin BD --ringer-bin RINGER \
+ --paperclip-bin PAPERCLIP --ringside-bin RINGSIDE --beads-host HOST \
+ --beads-store STORE --beads-claimant CLAIMANT --receipt prepared.json
+python3 tools/fleet_wave.py execute manifest-v1.json --prepared-receipt prepared.json \
+ --bd-bin BD --ringer-bin RINGER --beads-host HOST --beads-store STORE \
+ --beads-claimant CLAIMANT --receipt executed.json
+python3 tools/fleet_wave.py accept manifest-v1.json --prepared-receipt prepared.json \
+ --execute-receipt executed.json --bd-bin BD --ringer-bin RINGER \
+ --paperclip-bin PAPERCLIP --ringside-bin RINGSIDE --beads-host HOST \
+ --beads-store STORE --beads-claimant CLAIMANT --receipt terminal.json
 ```
 
-**Prepare** is read-only with respect to Beads: it runs exactly `bd show ID --json` (with the bound `BEADS_DIR`) for the child and each existing ID, parses only an exact object or one-item array, and requires each returned `id` to match. The child must already have exact `in_progress` status and claimant. It then reconciles Paperclip IDs with equivalent exact JSON readback, lints, and dry-runs before posting a prepared Paperclip receipt.
+Prepare invokes the fakeable atomic Beads `claim acquire` CLI/CAS operation, binding claimant, attempt, authority and dispatch reservation. Every claim error writes local `UNKNOWN_DEGRADED`, `dispatch_allowed:false`, non-authoritative truth, exits nonzero, and performs no Ringer or Paperclip operation. Execute renews with the prepared issue version immediately before dispatch. It requires the same claim ID and exactly one new immutable Ringer run receipt.
 
-**Execute** validates the prepared receipt fail-closed before dispatch: its schema version, `prepared` event, timezone-aware timestamp, exact allowed/required fields and types, literal `dispatch_authorized: true`, authority, manifest, and Ringer hashes must all match. It then re-reads the exact claim immediately before invoking the configured Ringer executable. It snapshots `<ringer_state_dir>/runs`, requires exactly one new JSON state file, and hash-binds it atomically. The execute receipt likewise has an exact field/type contract, timezone-aware timestamp, and hashes binding the manifest, Ringer manifest, prepared receipt, and run state.
+The exact state order is `INTAKE → LEDGERED → CLAIMED → MANIFEST-vN → LINTED → DRY-RUN → PAPERCLIP PREPARED RECEIPT → RINGER RUN → INDEPENDENT CHECK REPLAY → FRESH JUDGE` (only for judgmental work) `→ BEADS ACCEPTED/BLOCKED → Paperclip mirror → Ringside GETs`. A prepared receipt may carry the pre-execution states as one immutable composite bundle, but every transition is separately predecessor-chained; it never claims a walkthrough. Judgmental criteria require a fresh never-resumed Judge, a configured harness-secret HMAC over the complete attestation, and normalized principal/session non-overlap with controller and replay checker. There is no receipt-only pseudo-terminal: acceptance always closes and reads back Beads. Projection degradations use unique stage-specific immutable receipts.
 
-**Accept** validates the prepared and execute receipts with those exact fail-closed contracts and rejects a resolved `run_state_path` unless it is beneath the manifest-bound `<ringer_state_dir>/runs` directory, preventing traversal and path substitution. It then validates Ringer's real finished shape (`state=finished`, `finished=true`, exact pass/fail totals and summary, and every task `status=pass`, `verdict=PASS`, `check_returncode=0`). No top-level verdict is required. Every check is replayed in a fresh `/bin/sh` subprocess in the state-recorded task directory; expected paths must stay beneath that directory. Judgmental tasks additionally require an independent judge attestation created after execution, with an exact object shape, non-empty identity/criteria/rationale, exact ordered judgmental task keys, and bindings to the manifest, executed receipt SHA-256, and run-state SHA-256. Its SHA-256 is recorded in acceptance.
+Canonical JSON is UTF-8 JSON with sorted keys and separators `,`/`:`. `integrity.digest` is SHA-256 of that canonical object with `integrity` removed; predecessor digests ending in receipt files are SHA-256 of the immutable serialized file. Consumers recompute outer integrity and every inner transition integrity. `schema/fleet-wave-receipt.v1.json` is the companion schema and matches runtime field names, types and nullability; its E3 condition requires accepted receipts to carry command, zero exit status, tool hashes, environment digest, machine result, and separate stdout/stderr digests.
 
-Acceptance performs both read-only Ringside queries before any terminal Beads or Paperclip write and binds each full parsed response, endpoint, and raw-response SHA-256 into the exact terminal receipt. A Ringside failure therefore causes zero terminal writes. Acceptance then writes that exact terminal receipt to the canonical child Bead first. Only explicit `--accept-mode close` closes it using exactly `bd close ID --reason TEXT --json`, where `TEXT` is deterministically bound as `Fleet Wave accepted: wave_id=WAVE; manifest_sha256=MANIFEST_SHA256; execute_receipt_sha256=EXECUTE_RECEIPT_SHA256` and recorded as `beads_close_reason` in the receipt, then exactly reads back the closed Bead. Any Beads failure blocks Paperclip projection. Paperclip parents are never closed. Ringside walkthroughs call only `get BASE/api/runs` and `get BASE/api/library` and bind their read-only responses into the acceptance receipt.
+## Explicit fail-closed block
+
+Every fallible stage has an operator-invocable durable edge:
+
+```sh
+python3 tools/fleet_wave.py block manifest-v1.json --predecessor-receipt prior.json \
+ --failed-stage LINTED --reason-code lint_failure --bd-bin BD --ringer-bin RINGER \
+ --beads-host HOST --beads-store STORE --beads-claimant CLAIMANT --receipt blocked.json
+```
+
+Allowed failed stages are LEDGERED, CLAIMED, MANIFEST-vN, LINTED, DRY-RUN, PAPERCLIP PREPARED RECEIPT, RINGER RUN, INDEPENDENT CHECK REPLAY, and FRESH JUDGE. The command revalidates the claim, appends the chained `BEADS BLOCKED` receipt to Beads, and writes it append-only locally. Failures never become acceptance; projection outages are the sole degraded post-terminal case.
