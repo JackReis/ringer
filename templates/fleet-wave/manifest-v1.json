@@ -1,0 +1,22 @@
+{
+  "schema_version": "fleet-wave.v1",
+  "manifest_version": 1,
+  "wave_id": "replace-with-stable-wave-id",
+  "supersedes": null,
+  "run_name": "fleet-wave-template",
+  "workdir": "/tmp/fleet-wave-template",
+  "max_parallel": 1,
+  "ringer_manifest": "../../manifests/replace-me.json",
+  "beads": {"claim_id": "replace-me", "existing_ids": []},
+  "paperclip": {"issue_id": "replace-me", "existing_ids": []},
+  "tasks": [
+    {
+      "key": "replace-with-ringer-task-key",
+      "spec": "Work only in this task directory. Create proof.txt containing a concise description of the completed work and the exact verification performed. Do not claim completion unless the file is non-empty and accurately records durable evidence. Replace this template specification and check with requirements specific to the real task before preparing the wave.",
+      "check": "test -s proof.txt || { echo 'FAIL: proof.txt missing or empty'; exit 1; }",
+      "expect_files": ["proof.txt"],
+      "verified": "The task produced a non-empty durable evidence file; replace this sentence with the real property proved by the check.",
+      "evidence": {"strength": "strong", "kind": "objective"}
+    }
+  ]
+}
