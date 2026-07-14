@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import hashlib, hmac, json, os, socket, subprocess, sys, tempfile, unittest
+import hashlib, hmac, importlib.util, json, os, socket, subprocess, sys, tempfile, unittest
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]; TOOL=ROOT/'tools/fleet_wave.py'
+SPEC=importlib.util.spec_from_file_location('fleet_wave_tool',TOOL);FW=importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(FW)
 def executable(path, body):
  path.write_text('#!/usr/bin/env python3\n'+body); path.chmod(0o755); return path
 class FleetWaveTests(unittest.TestCase):
  def setUp(self):
   self.t=tempfile.TemporaryDirectory(); self.root=Path(self.t.name); self.log=self.root/'calls.jsonl'; self.runs=self.root/'state'/'runs'; self.runs.mkdir(parents=True)
+  self.sandbox_log=self.root/'sandbox.jsonl';self.sandbox=self.root/'sandbox-exec';self.sandbox.write_text(f'#!/bin/sh\nprintf "%s\\n" "$*" >> "{self.sandbox_log}"\n[ "$1" = -f ] || exit 90\nshift 2\nexec "$@"\n');self.sandbox.chmod(0o755)
   self.work=self.root/'work'; (self.work/'alpha').mkdir(parents=True); (self.work/'alpha'/'proof.txt').write_text('proof\n')
   self.bd=executable(self.root/'bd',"""import json,os,sys
 with open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps(['bd',*sys.argv[1:]])+'\\n')
@@ -52,7 +54,7 @@ print(json.dumps({'runs':[{'run_id':'r1'}]} if sys.argv[-1].endswith('/api/runs'
  def write_manifest(self,**kw):
   d={'schema_version':'fleet-wave.v1','manifest_version':1,'wave_id':'wave','attempt_id':'attempt-1','supersedes':None,'ringer_manifest':str(self.rm),'ringer_state_dir':str(self.runs.parent),'beads':{'host':socket.gethostname(),'store':'/ledger/main.db','claimant':'alice','issue_id':'bead-child','existing_ids':[]},'paperclip':{'issue_id':'pc-parent','existing_ids':[]},'ringside':{'base_url':'http://127.0.0.1:9999'},'bifrost':{'correlation':None},'tasks':[{'key':'alpha','work_type':'other','check':'test -s proof.txt && grep -q proof proof.txt','negative_controls':[{'name':'missing artifact','setup':'rm -f proof.txt'},{'name':'wrong content','setup':"printf 'wrong\\n' > proof.txt"}],'evidence':{'strength':'strong','kind':'objective'}}]};d.update(kw);self.m.write_text(json.dumps(d))
  def cli(self,cmd,extra=(),env=None):
-  receipts={'prepare':self.prep,'execute':self.exe,'accept':self.done,'block':self.done}; a=[sys.executable,str(TOOL),cmd,str(self.m),'--bd-bin',str(self.bd),'--ringer-bin',str(self.ringer),'--paperclip-bin',str(self.pc),'--ringside-bin',str(self.ringside),'--beads-host',socket.gethostname(),'--beads-store','/ledger/main.db','--beads-claimant','alice','--receipt',str(receipts[cmd])]
+  receipts={'prepare':self.prep,'execute':self.exe,'accept':self.done,'block':self.done}; a=[sys.executable,str(TOOL),cmd,str(self.m),'--bd-bin',str(self.bd),'--ringer-bin',str(self.ringer),'--paperclip-bin',str(self.pc),'--ringside-bin',str(self.ringside),'--sandbox-bin',str(self.sandbox),'--beads-host',socket.gethostname(),'--beads-store','/ledger/main.db','--beads-claimant','alice','--receipt',str(receipts[cmd])]
   if cmd=='execute':a += ['--prepared-receipt',str(self.prep)]
   if cmd=='accept':a += ['--prepared-receipt',str(self.prep),'--execute-receipt',str(self.exe)]
   e=os.environ.copy();e.update({'CALL_LOG':str(self.log),'RUNS':str(self.runs),'TASKDIR':str(self.work/'alpha')});e.update(env or {})
@@ -189,4 +191,26 @@ print(json.dumps({'runs':[{'run_id':'r1'}]} if sys.argv[-1].endswith('/api/runs'
  def test_manifest_and_receipts_bind_attempt_and_chain(self):
   self.prepare_ok();p=json.loads(self.prep.read_text());self.assertEqual('attempt-1',p['attempt_id']);self.assertIn('authority',p);self.assertIn('integrity',p)
   r=self.cli('execute');self.assertEqual(0,r.returncode,r.stderr);e=json.loads(self.exe.read_text());self.assertEqual(p['receipt_id'],e['predecessor']['receipt_id']);self.assertEqual(hashlib.sha256(self.prep.read_bytes()).hexdigest(),e['predecessor']['digest'])
+ def test_sandboxed_shell_has_exact_environment_and_three_command_classes(self):
+  old=os.environ.get('FLEET_PARENT_SENTINEL');os.environ['FLEET_PARENT_SENTINEL']='parent-only-secret'
+  try:
+   for label,command,expected in [('replay-check','test -z "$FLEET_PARENT_SENTINEL"',0),('negative-setup','rm -f proof.txt',0),('negative-check','false',1)]:
+    home=self.root/label;home.mkdir();fixture=home/'task';fixture.mkdir();(fixture/'proof.txt').write_text('proof')
+    r=FW.sandboxed_shell(command,fixture,home,self.sandbox);self.assertEqual(expected,r.returncode)
+    self.assertEqual({'PATH':'/usr/bin:/bin','HOME':str(home),'TMPDIR':str(home),'LANG':'C','LC_ALL':'C','TZ':'UTC'},FW.verification_env(home))
+   logged=self.sandbox_log.read_text();self.assertIn('FLEET_PARENT_SENTINEL',logged);self.assertIn('rm -f proof.txt',logged);self.assertIn('false',logged)
+  finally:
+   if old is None:os.environ.pop('FLEET_PARENT_SENTINEL',None)
+   else:os.environ['FLEET_PARENT_SENTINEL']=old
+ def test_sandbox_failures_never_retry_raw_command(self):
+  fixture=self.root/'isolated';fixture.mkdir();home=self.root/'home';home.mkdir();side=self.root/'escaped'
+  with self.assertRaises(FW.ProtocolError):FW.sandboxed_shell(f"touch {side}",fixture,home,self.root/'missing-sandbox')
+  self.assertFalse(side.exists());failing=self.root/'failing-sandbox';failing.write_text('#!/bin/sh\nexit 97\n');failing.chmod(0o755)
+  with self.assertRaises(FW.ProtocolError):FW.sandboxed_shell(f"touch {side}",fixture,home,failing)
+  self.assertFalse(side.exists())
+ def test_seatbelt_profile_is_deny_default_network_denied_and_write_scoped(self):
+  cwd=self.root/'fixture';home=self.root/'home';cwd.mkdir();home.mkdir();profile=FW.sandbox_profile(cwd,home)
+  self.assertIn('(deny default)',profile);self.assertIn('(deny network*)',profile);self.assertIn('(allow process*)',profile)
+  write_line=next(x for x in profile.splitlines() if x.startswith('(allow file-write*'))
+  self.assertIn(str(cwd.resolve()),write_line);self.assertIn(str(home.resolve()),write_line);self.assertNotIn('/usr)',write_line)
 if __name__=='__main__':unittest.main()

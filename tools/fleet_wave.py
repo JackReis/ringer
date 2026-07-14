@@ -6,6 +6,38 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 class ProtocolError(RuntimeError): pass
+SANDBOX_POLICY_VERSION='fleet-wave-seatbelt.v1'
+def verification_env(temp_home):
+ return {'PATH':'/usr/bin:/bin','HOME':str(temp_home),'TMPDIR':str(temp_home),'LANG':'C','LC_ALL':'C','TZ':'UTC'}
+def _seatbelt_quote(path):return '"'+str(Path(path).resolve()).replace('\\','\\\\').replace('"','\\"')+'"'
+def sandbox_profile(cwd,temp_home):
+ reads=['/usr','/bin','/System','/Library','/private/etc','/private/var/db','/dev',cwd,temp_home]
+ writes=[cwd,temp_home]
+ return '\n'.join(['(version 1)','(deny default)','(deny network*)','(allow process*)','(allow file-read-metadata)',f"(allow file-read-data {' '.join(f'(subpath {_seatbelt_quote(x)})' for x in reads)})",f"(allow file-write* {' '.join(f'(subpath {_seatbelt_quote(x)})' for x in writes)})",''])
+def sandboxed_shell(command,cwd,temp_home,sandbox_bin):
+ cwd=Path(cwd).resolve();home=Path(temp_home).resolve()
+ if not sandbox_bin:raise ProtocolError('sandbox backend required on this platform')
+ sandbox=Path(sandbox_bin).resolve()
+ if not sandbox.is_file() or not os.access(sandbox,os.X_OK):raise ProtocolError(f'sandbox backend unavailable: {sandbox_bin}')
+ profile_text=sandbox_profile(cwd,home);marker=home/f'.fleet-wave-child-status-{os.getpid()}-{hashlib.sha256(command.encode()).hexdigest()[:12]}';profile=None
+ try:
+  try:
+   fd,profile=tempfile.mkstemp(prefix='fleet-wave-seatbelt-',suffix='.sb',dir=home)
+   with os.fdopen(fd,'w') as f:f.write(profile_text);f.flush();os.fsync(f.fileno())
+  except OSError as e:raise ProtocolError(f'sandbox profile creation failed: {e}') from e
+  quoted=subprocess.list2cmdline([str(marker)]);wrapped=f"{command}\nstatus=$?\nprintf '%s\\n' \"$status\" > {quoted}\nexit \"$status\""
+  try:r=subprocess.run([str(sandbox),'-f',profile,'/bin/sh','-c',wrapped],cwd=cwd,env=verification_env(home),text=True,capture_output=True)
+  except OSError as e:raise ProtocolError(f'sandbox backend unavailable: {e}') from e
+  try:status=int(marker.read_text().strip())
+  except (OSError,ValueError) as e:raise ProtocolError(f'sandbox backend/policy failure (exit {r.returncode}): {r.stderr.strip()}') from e
+  if status!=r.returncode:raise ProtocolError('sandbox backend returned a status different from the child')
+  r.sandbox_metadata={'executable':str(sandbox),'profile_digest':hashlib.sha256(profile_text.encode()).hexdigest(),'policy_version':SANDBOX_POLICY_VERSION,'environment_digest':json_digest(verification_env(home))}
+  return r
+ finally:
+  for q in (profile,marker):
+   if q:
+    try:Path(q).unlink()
+    except OSError:pass
 def now(): return datetime.now(timezone.utc).isoformat(timespec='microseconds').replace('+00:00','Z')
 def load(path):
  try:v=json.loads(Path(path).read_text())
@@ -216,9 +248,9 @@ def replay_child(a):
  root=Path(a.snapshot).resolve();inv=json.loads(Path(a.inventory).read_text())
  if inventory_tree(root)!=inv or json_digest(inv)!=a.tree_digest:raise ProtocolError('replay CAS validation failed')
  with tempfile.TemporaryDirectory(prefix='fleet-wave-independent-') as d:
-  task=Path(d)/'task';shutil.copytree(root,task);env={'PATH':'/usr/bin:/bin','LANG':'C','LC_ALL':'C','HOME':d,'TMPDIR':d,'TZ':'UTC'}
-  r=subprocess.run(['/bin/sh','-c',a.check],cwd=task,env=env,text=True,capture_output=True)
-  write_receipt(a.output,{'checker':{'principal':'fleet-wave-independent-replay','session_id':str(os.getpid()),'parent_pid':os.getppid()},'tree_digest':a.tree_digest,'exit_status':r.returncode,'stdout_sha256':hashlib.sha256(r.stdout.encode()).hexdigest(),'stderr_sha256':hashlib.sha256(r.stderr.encode()).hexdigest()})
+  task=Path(d)/'task';shutil.copytree(root,task)
+  r=sandboxed_shell(a.check,task,d,a.sandbox_bin)
+  write_receipt(a.output,{'checker':{'principal':'fleet-wave-independent-replay','session_id':str(os.getpid()),'parent_pid':os.getppid()},'tree_digest':a.tree_digest,'exit_status':r.returncode,'stdout_sha256':hashlib.sha256(r.stdout.encode()).hexdigest(),'stderr_sha256':hashlib.sha256(r.stderr.encode()).hexdigest(),'sandbox':r.sandbox_metadata})
   if r.returncode:raise ProtocolError('independent replay check failed')
 def prepare(a):
  p,m,rp=context(a);b=m['beads']
@@ -302,14 +334,15 @@ def accept(a):
   if expected_inv!=snap['inventory'] or json_digest(expected_inv)!=snap['tree_digest']:raise ProtocolError('execute-bound replay input mismatch')
   with tempfile.TemporaryDirectory(prefix='fleet-wave-checker-receipt-') as out:
    inv=Path(out)/'inventory.json';inv.write_text(json.dumps(snap['inventory']));result=Path(out)/'result.json'
-   run([sys.executable,str(Path(__file__).resolve()),'replay-one','--snapshot',snap['path'],'--inventory',str(inv),'--tree-digest',snap['tree_digest'],'--check',command,'--output',str(result)])
+   run([sys.executable,str(Path(__file__).resolve()),'replay-one','--snapshot',snap['path'],'--inventory',str(inv),'--tree-digest',snap['tree_digest'],'--check',command,'--output',str(result),'--sandbox-bin',a.sandbox_bin])
    rr=load(result)
   raw_digest=json_digest({'stdout_sha256':rr['stdout_sha256'],'stderr_sha256':rr['stderr_sha256']})
-  replay[k]={'checker':rr['checker'],'tree_digest':rr['tree_digest']};check_execution[k]={'command':['/bin/sh','-c',command],'exit_status':rr['exit_status'],'tool_check_versions':[{'tool':'/bin/sh','sha256':digest('/bin/sh')},{'tool':'fleet_wave.py','sha256':digest(__file__)}],'environment_digest':json_digest({'PATH':'/usr/bin:/bin','LANG':'C','LC_ALL':'C','TZ':'UTC'}),'machine_readable_result':{'verdict':'PASS','stdout_sha256':rr['stdout_sha256'],'stderr_sha256':rr['stderr_sha256']},'raw_output_digest':raw_digest};clean_replay[k]={'isolated_copy':True,'checker':rr['checker'],'tree_digest':rr['tree_digest'],'exit_status':rr['exit_status'],'negative_controls':[]}
+  replay[k]={'checker':rr['checker'],'tree_digest':rr['tree_digest']};check_execution[k]={'command':['/bin/sh','-c',command],'exit_status':rr['exit_status'],'tool_check_versions':[{'tool':'/bin/sh','sha256':digest('/bin/sh')},{'tool':'fleet_wave.py','sha256':digest(__file__)}],'environment_digest':rr['sandbox']['environment_digest'],'sandbox':rr['sandbox'],'machine_readable_result':{'verdict':'PASS','stdout_sha256':rr['stdout_sha256'],'stderr_sha256':rr['stderr_sha256']},'raw_output_digest':raw_digest};clean_replay[k]={'isolated_copy':True,'checker':rr['checker'],'tree_digest':rr['tree_digest'],'exit_status':rr['exit_status'],'negative_controls':[]}
   for control in fleet[k]['negative_controls']:
    with tempfile.TemporaryDirectory(prefix='fleet-wave-negative-') as neg:
-    fixture=Path(neg)/'task';shutil.copytree(Path(snap['path']),fixture);run(['/bin/sh','-c',control['setup']],cwd=fixture)
-    nr=subprocess.run(['/bin/sh','-c',command],cwd=fixture,text=True,capture_output=True)
+    fixture=Path(neg)/'task';shutil.copytree(Path(snap['path']),fixture);setup=sandboxed_shell(control['setup'],fixture,neg,a.sandbox_bin)
+    if setup.returncode:raise ProtocolError(f"negative control setup failed: {k}/{control['name']}")
+    nr=sandboxed_shell(command,fixture,neg,a.sandbox_bin)
     if nr.returncode==0:raise ProtocolError(f"negative control did not fail strong check: {k}/{control['name']}")
     clean_replay[k]['negative_controls'].append({'name':control['name'],'setup':control['setup'],'observed_exit_status':nr.returncode,'raw_output_sha256':hashlib.sha256((nr.stdout+nr.stderr).encode()).hexdigest()})
  judge_hash=None;judgment=[x['key'] for x in m['tasks'] if x['evidence']['kind']=='judgmental']
@@ -327,7 +360,7 @@ def accept(a):
  for key in keys:
   artifact={'schema_version':'fleet-wave-e3.v1','class':'E3','work_id':m['beads']['issue_id'],'attempt_id':m['attempt_id'],'manifest_digest':digest(p),'task_key':key,'cas_tree_digest':ex['replay_inputs'][key]['tree_digest'],'input_inventory_digest':json_digest(ex['replay_inputs'][key]['inventory']),'check_execution':check_execution[key],'observed_at':observed}
   path=evidence_dir/f"e3-{key}.json";write_receipt(path,artifact);e3_digests[key]=digest(path);evidence_entries.append({'class':'E3','uri':path.resolve().as_uri(),'digest':digest(path),'size_bytes':path.stat().st_size,'provenance':{'producer':'fleet-wave-independent-replay','task_key':key,'cas_tree_digest':artifact['cas_tree_digest']},'observed_at':observed,'freshness':{'basis':'acceptance-run','status':'fresh'}})
- e4={'schema_version':'fleet-wave-e4.v1','class':'E4','work_id':m['beads']['issue_id'],'attempt_id':m['attempt_id'],'manifest_digest':digest(p),'execute_receipt_digest':digest(a.execute_receipt),'run_state_digest':digest(sp),'e3_artifact_digests':e3_digests,'cas_tree_digests':{k:ex['replay_inputs'][k]['tree_digest'] for k in keys},'input_inventory_digests':{k:json_digest(ex['replay_inputs'][k]['inventory']) for k in keys},'checker_receipts':replay,'observed_at':observed}
+ e4={'schema_version':'fleet-wave-e4.v1','class':'E4','work_id':m['beads']['issue_id'],'attempt_id':m['attempt_id'],'manifest_digest':digest(p),'execute_receipt_digest':digest(a.execute_receipt),'run_state_digest':digest(sp),'e3_artifact_digests':e3_digests,'cas_tree_digests':{k:ex['replay_inputs'][k]['tree_digest'] for k in keys},'input_inventory_digests':{k:json_digest(ex['replay_inputs'][k]['inventory']) for k in keys},'checker_receipts':replay,'sandbox_policy':{k:check_execution[k]['sandbox'] for k in keys},'observed_at':observed}
  e4_path=evidence_dir/'e4-independent-replay.json';write_receipt(e4_path,e4);evidence_entries.append({'class':'E4','uri':e4_path.resolve().as_uri(),'digest':digest(e4_path),'size_bytes':e4_path.stat().st_size,'provenance':{'producer':'fleet-wave-controller','e3_artifact_digests':e3_digests},'observed_at':observed,'freshness':{'basis':'acceptance-run','status':'fresh'}})
  chain=transition_chain(m,['RINGER RUN','INDEPENDENT CHECK REPLAY'],ex['claim_id'],ex['beads_issue_version'],evidence={'INDEPENDENT CHECK REPLAY':evidence_entries},existing=ex['transitions'])
  if judgment:chain=transition_chain(m,['INDEPENDENT CHECK REPLAY','FRESH JUDGE'],ex['claim_id'],ex['beads_issue_version'],existing=chain)
@@ -335,7 +368,7 @@ def accept(a):
  final_states=['INTAKE','LEDGERED','CLAIMED',f"MANIFEST-v{m['manifest_version']}",'LINTED','DRY-RUN','PAPERCLIP PREPARED RECEIPT','RINGER RUN','INDEPENDENT CHECK REPLAY']+(['FRESH JUDGE'] if judgment else [])+['BEADS ACCEPTED'];validate_transitions(chain,final_states,m,ex['claim_id'],ex['beads_issue_version'])
  rec={'schema_version':'fleet-wave.v1','event':'accepted','accepted_at':now(),'wave_id':m['wave_id'],'manifest_sha256':digest(p),'ringer_manifest_sha256':digest(rp),'execute_receipt_sha256':digest(a.execute_receipt),'run_state_sha256':digest(sp),'independent_replay':replay,'check_execution':check_execution,'clean_replay':clean_replay,'judge_receipt_sha256':judge_hash,'bifrost_correlation':None,'ringside_read_only':[],'accept_mode':'close','beads_close_reason':None,'authoritative_disposition':'accepted','transitions':chain}
  terminal_state='BEADS ACCEPTED'
- enrich(rec,m,'terminal','FRESH JUDGE' if judgment else 'INDEPENDENT CHECK REPLAY',terminal_state,predecessor={'receipt_id':ex['receipt_id'],'digest':digest(a.execute_receipt)},stage={'policy_evaluation':'all mandatory checks passed','accepted_evidence_set':[digest(sp)],'unresolved_discrepancy_count':0})
+ enrich(rec,m,'terminal','FRESH JUDGE' if judgment else 'INDEPENDENT CHECK REPLAY',terminal_state,predecessor={'receipt_id':ex['receipt_id'],'digest':digest(a.execute_receipt)},stage={'policy_evaluation':'all mandatory checks passed','accepted_evidence_set':[digest(sp)],'unresolved_discrepancy_count':0,'sandbox_policy':{k:check_execution[k]['sandbox'] for k in keys}})
  close_reason=f"Fleet Wave accepted: wave_id={m['wave_id']}; manifest_sha256={digest(p)}; execute_receipt_sha256={digest(a.execute_receipt)}"
  rec['beads_close_reason']=close_reason
  rec['claim_id']=ex['claim_id'];rec['beads_issue_version']=ex['beads_issue_version']
@@ -383,7 +416,7 @@ def parser():
  c=argparse.ArgumentParser(add_help=False)
  for x in ('manifest',):c.add_argument(x)
  for x in ('--bd-bin','--ringer-bin','--beads-host','--beads-store','--beads-claimant','--receipt'):c.add_argument(x,required=True)
- c.add_argument('--paperclip-bin');c.add_argument('--ringside-bin');root=argparse.ArgumentParser(description=__doc__);subs=root.add_subparsers(dest='command',required=True);subs.add_parser('prepare',parents=[c]);e=subs.add_parser('execute',parents=[c]);e.add_argument('--prepared-receipt',required=True);a=subs.add_parser('accept',parents=[c]);a.add_argument('--prepared-receipt',required=True);a.add_argument('--execute-receipt',required=True);a.add_argument('--judge-receipt');b=subs.add_parser('block',parents=[c]);b.add_argument('--predecessor-receipt',required=True);b.add_argument('--failed-stage',required=True,choices=['INTAKE','LEDGERED','CLAIMED','MANIFEST-vN','LINTED','DRY-RUN','PAPERCLIP PREPARED RECEIPT','RINGER RUN','INDEPENDENT CHECK REPLAY','FRESH JUDGE']);b.add_argument('--reason-code',required=True);r=subs.add_parser('replay-one');r.add_argument('--snapshot',required=True);r.add_argument('--inventory',required=True);r.add_argument('--tree-digest',required=True);r.add_argument('--check',required=True);r.add_argument('--output',required=True);return root
+ c.add_argument('--paperclip-bin');c.add_argument('--ringside-bin');c.add_argument('--sandbox-bin',default='/usr/bin/sandbox-exec' if sys.platform=='darwin' else None);root=argparse.ArgumentParser(description=__doc__);subs=root.add_subparsers(dest='command',required=True);subs.add_parser('prepare',parents=[c]);e=subs.add_parser('execute',parents=[c]);e.add_argument('--prepared-receipt',required=True);a=subs.add_parser('accept',parents=[c]);a.add_argument('--prepared-receipt',required=True);a.add_argument('--execute-receipt',required=True);a.add_argument('--judge-receipt');b=subs.add_parser('block',parents=[c]);b.add_argument('--predecessor-receipt',required=True);b.add_argument('--failed-stage',required=True,choices=['INTAKE','LEDGERED','CLAIMED','MANIFEST-vN','LINTED','DRY-RUN','PAPERCLIP PREPARED RECEIPT','RINGER RUN','INDEPENDENT CHECK REPLAY','FRESH JUDGE']);b.add_argument('--reason-code',required=True);r=subs.add_parser('replay-one');r.add_argument('--snapshot',required=True);r.add_argument('--inventory',required=True);r.add_argument('--tree-digest',required=True);r.add_argument('--check',required=True);r.add_argument('--output',required=True);r.add_argument('--sandbox-bin',default='/usr/bin/sandbox-exec' if sys.platform=='darwin' else None);return root
 def main(argv=None):
  a=parser().parse_args(argv)
  try:{'prepare':prepare,'execute':execute,'accept':accept,'block':block,'replay-one':replay_child}[a.command](a)
