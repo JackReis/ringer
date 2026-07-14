@@ -1,0 +1,57 @@
+{
+  "run_name": "fleet-clean-streak-10",
+  "workdir": "/Users/hermes/Documents/Codex/2026-07-14/ringer-clean-streak/cycle-10/work",
+  "max_parallel": 4,
+  "tasks": [
+    {
+      "key": "aegis-control-plane",
+      "spec": "Install and execute a deterministic probe of Aegis fleet control-plane endpoints.\nMOCK_FILE: probe.py\nfrom __future__ import annotations\nimport json\nimport sys\nimport urllib.request\n\nendpoints = {\n    \"paperclip\": \"http://127.0.0.1:3100/api/health\",\n    \"ringside\": \"http://127.0.0.1:8700/api/runs\",\n    \"openbrain\": \"http://127.0.0.1:8787/health\",\n    \"bifrost\": \"http://127.0.0.1:8078/health\",\n    \"hindsight\": \"http://127.0.0.1:8888/health\",\n}\nresults = {}\nerrors = []\nfor name, url in endpoints.items():\n    try:\n        with urllib.request.urlopen(url, timeout=6) as response:\n            payload = json.load(response)\n            results[name] = {\"status\": response.status, \"json_type\": type(payload).__name__}\n            if response.status != 200:\n                errors.append(f\"{name}: expected HTTP 200, got {response.status}\")\n    except Exception as exc:\n        results[name] = {\"error\": str(exc)}\n        errors.append(f\"{name}: {exc}\")\nprint(json.dumps({\"results\": results, \"errors\": errors}, sort_keys=True))\nif errors:\n    print(\"FAIL: \" + \"; \".join(errors), file=sys.stderr)\n    raise SystemExit(1)\nprint(\"PASS: all five Aegis control-plane endpoints returned HTTP 200 with JSON\")\nMOCK_END\n",
+      "check": "python3.12 probe.py || { rc=$?; echo \"FAIL: probe.py exited $rc; see output above\"; exit $rc; }",
+      "expect_files": [
+        "probe.py"
+      ],
+      "engine": "mock",
+      "timeout_s": 120,
+      "task_type": "probe",
+      "verified": "All five Aegis control-plane endpoints returned HTTP 200 and valid JSON."
+    },
+    {
+      "key": "talaris-cross-host",
+      "spec": "Install and execute a deterministic SSH-before-verification probe of Talaris and fleet tunnels.\nMOCK_FILE: probe.py\nfrom __future__ import annotations\nimport json\nimport subprocess\nimport sys\n\nurls = [\n    \"http://127.0.0.1:8082/api/health\",\n    \"http://127.0.0.1:3110/api/health\",\n    \"http://127.0.0.1:8700/api/runs\",\n    \"http://127.0.0.1:8078/health\",\n]\nremote = \"set -eu; hostname -s; \" + \" \".join(\n    f\"code=$(/usr/bin/curl -sS -o /dev/null -w '%{{http_code}}' --max-time 6 {url}); printf '%s %s\\\\n' \\\"$code\\\" {url};\"\n    for url in urls\n)\nproc = subprocess.run(\n    [\"ssh\", \"-o\", \"BatchMode=yes\", \"-o\", \"ConnectTimeout=8\", \"jack.reis@100.97.178.76\", remote],\n    text=True,\n    capture_output=True,\n    timeout=45,\n)\nlines = [line.strip() for line in proc.stdout.splitlines() if line.strip()]\nerrors = []\nif proc.returncode != 0:\n    errors.append(f\"ssh exited {proc.returncode}: {proc.stderr.strip()}\")\nif not lines or not lines[0].lower().startswith(\"talaris\"):\n    errors.append(f\"unexpected remote hostname output: {lines[:1]}\")\nobserved = {}\nfor line in lines[1:]:\n    parts = line.split(maxsplit=1)\n    if len(parts) == 2:\n        observed[parts[1]] = parts[0]\nfor url in urls:\n    if observed.get(url) != \"200\":\n        errors.append(f\"{url}: expected 200, got {observed.get(url, 'missing')}\")\nprint(json.dumps({\"returncode\": proc.returncode, \"observed\": observed, \"stderr\": proc.stderr.strip(), \"errors\": errors}, sort_keys=True))\nif errors:\n    print(\"FAIL: \" + \"; \".join(errors), file=sys.stderr)\n    raise SystemExit(1)\nprint(\"PASS: Talaris and all four cross-host/tunnel surfaces are healthy\")\nMOCK_END\n",
+      "check": "python3.12 probe.py || { rc=$?; echo \"FAIL: probe.py exited $rc; see output above\"; exit $rc; }",
+      "expect_files": [
+        "probe.py"
+      ],
+      "engine": "mock",
+      "timeout_s": 120,
+      "task_type": "probe",
+      "verified": "Talaris was reachable non-interactively and its Command Centre plus three Aegis tunnels returned HTTP 200."
+    },
+    {
+      "key": "canonical-work-state",
+      "spec": "Install and execute a deterministic read-only probe of canonical Beads and Paperclip work state.\nMOCK_FILE: probe.py\nfrom __future__ import annotations\nimport json\nimport os\nimport subprocess\nimport sys\nimport urllib.request\n\nenv = os.environ.copy()\nenv[\"BEADS_DIR\"] = \"/Users/hermes/.beads\"\nerrors = []\ndef run_json(args):\n    proc = subprocess.run(args, text=True, capture_output=True, env=env, timeout=20)\n    if proc.returncode != 0:\n        raise RuntimeError(f\"{' '.join(args)} exited {proc.returncode}: {proc.stderr.strip()}\")\n    return json.loads(proc.stdout)\ntry:\n    stats = run_json([\"bd\", \"stats\", \"--json\"])\n    bead = run_json([\"bd\", \"show\", \"hermes-ujgu\", \"--json\"])\n    bead_obj = bead[0] if isinstance(bead, list) else bead\n    if bead_obj.get(\"status\") not in {\"in_progress\", \"closed\"}:\n        errors.append(f\"Bead hermes-ujgu unexpected status {bead_obj.get('status')}\")\nexcept Exception as exc:\n    stats = {}\n    bead_obj = {}\n    errors.append(f\"Beads read failed: {exc}\")\ntry:\n    url = \"http://127.0.0.1:3100/api/issues/12876576-f5d1-4dff-99e8-a71a7a2c0f8e\"\n    with urllib.request.urlopen(url, timeout=6) as response:\n        issue = json.load(response)\n    if issue.get(\"identifier\") != \"JAC-3415\":\n        errors.append(f\"Paperclip identifier mismatch: {issue.get('identifier')}\")\n    if issue.get(\"status\") not in {\"in_progress\", \"in_review\", \"done\"}:\n        errors.append(f\"Paperclip JAC-3415 unexpected status {issue.get('status')}\")\nexcept Exception as exc:\n    issue = {}\n    errors.append(f\"Paperclip read failed: {exc}\")\nprint(json.dumps({\"beads_summary\": stats.get(\"summary\", {}), \"bead_status\": bead_obj.get(\"status\"), \"paperclip_status\": issue.get(\"status\"), \"errors\": errors}, sort_keys=True))\nif errors:\n    print(\"FAIL: \" + \"; \".join(errors), file=sys.stderr)\n    raise SystemExit(1)\nprint(\"PASS: canonical Beads and Paperclip work-state records are readable and active\")\nMOCK_END\n",
+      "check": "python3.12 probe.py || { rc=$?; echo \"FAIL: probe.py exited $rc; see output above\"; exit $rc; }",
+      "expect_files": [
+        "probe.py"
+      ],
+      "engine": "mock",
+      "timeout_s": 120,
+      "task_type": "probe",
+      "verified": "Beads hermes-ujgu and Paperclip JAC-3415 were readable and in an allowed active/completed state.",
+      "paperclip_issue": "JAC-3415",
+      "bead_id": "hermes-ujgu"
+    },
+    {
+      "key": "owned-ringer-fork",
+      "spec": "Install and execute a deterministic probe of the fleet-owned Ringer fork and launcher.\nMOCK_FILE: probe.py\nfrom __future__ import annotations\nimport json\nimport subprocess\nimport sys\n\nerrors = []\ndef run(args, timeout=20):\n    proc = subprocess.run(args, text=True, capture_output=True, timeout=timeout)\n    if proc.returncode != 0:\n        errors.append(f\"{' '.join(args)} exited {proc.returncode}: {proc.stderr.strip()}\")\n    return proc.stdout.strip()\nurl = run([\"git\", \"-C\", \"/Users/hermes/ringer\", \"remote\", \"get-url\", \"fleet\"])\nheads = run([\"git\", \"-C\", \"/Users/hermes/ringer\", \"ls-remote\", \"--heads\", \"fleet\", \"fleet-sync/paperclip-to-ringer-20260709\"], timeout=40)\nhelp_line = run([\"/Users/hermes/.local/bin/ringer\", \"--help\"]).splitlines()\nif url != \"https://github.com/JackReis/ringer-fleet.git\":\n    errors.append(f\"fleet fork URL mismatch: {url}\")\nif not heads.startswith(\"47ccc11\"):\n    errors.append(f\"owned fork branch head mismatch/unreachable: {heads[:80]}\")\nif not help_line or not help_line[0].startswith(\"usage: ringer.py\"):\n    errors.append(\"pinned Ringer launcher did not execute supported Python entrypoint\")\nprint(json.dumps({\"fleet_remote\": url, \"head\": heads.split()[0] if heads else None, \"launcher\": help_line[0] if help_line else None, \"errors\": errors}, sort_keys=True))\nif errors:\n    print(\"FAIL: \" + \"; \".join(errors), file=sys.stderr)\n    raise SystemExit(1)\nprint(\"PASS: fleet-owned Ringer fork and pinned Python 3.12 launcher are operational\")\nMOCK_END\n",
+      "check": "python3.12 probe.py || { rc=$?; echo \"FAIL: probe.py exited $rc; see output above\"; exit $rc; }",
+      "expect_files": [
+        "probe.py"
+      ],
+      "engine": "mock",
+      "timeout_s": 120,
+      "task_type": "probe",
+      "verified": "The JackReis/ringer-fleet branch was reachable at the expected integration commit and the Python 3.12 launcher worked."
+    }
+  ]
+}

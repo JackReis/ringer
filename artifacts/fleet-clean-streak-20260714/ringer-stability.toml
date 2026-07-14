@@ -1,0 +1,24 @@
+identity_default = "aegis"
+state_dir = "~/.ringer"
+dashboard_port_base = 8700
+allow_full_access = false
+
+[eval]
+backend = "jsonl"
+jsonl_path = "~/.ringer/runs.jsonl"
+
+[engines.mock]
+bin = "/Users/hermes/.local/bin/python3.12"
+args_template = [
+  "/Users/hermes/ringer/engines/mock_worker.py",
+  "{spec}",
+]
+model_default = "deterministic-fixture"
+sandbox_args = []
+full_access_args = []
+
+[artifact]
+enabled = true
+out = "~/.ringer/artifacts/{run_id}.html"
+report_out = "~/.ringer/artifacts/{run_id}-report.html"
+index_out = "~/.ringer/artifacts/index.html"

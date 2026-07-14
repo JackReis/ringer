@@ -1,0 +1,479 @@
+{
+  "schema_version": 1,
+  "target_streak": 10,
+  "started_at": "2026-07-14T19:03:27.797558+00:00",
+  "runs": [
+    {
+      "cycle": 1,
+      "clean": true,
+      "run_id": "fleet-clean-streak-01-20260714T190327Z-p99078",
+      "state_path": "/Users/hermes/.ringer/runs/fleet-clean-streak-01-20260714T190327Z-p99078.json",
+      "artifact_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-01-20260714T190327Z-p99078.html",
+      "report_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-01-20260714T190327Z-p99078-report.html",
+      "summary": {
+        "fail": 0,
+        "pass": 4,
+        "tokens": 0
+      },
+      "tasks": [
+        {
+          "key": "aegis-control-plane",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"results\": {\"bifrost\": {\"json_type\": \"dict\", \"status\": 200}, \"hindsight\": {\"json_type\": \"dict\", \"status\": 200}, \"openbrain\": {\"json_type\": \"dict\", \"status\": 200}, \"paperclip\": {\"json_type\": \"dict\", \"status\": 200}, \"ringside\": {\"json_type\": \"dict\", \"status\": 200}}} PASS: all five Aegis control-plane endpoints returned HTTP 200 with JSON"
+        },
+        {
+          "key": "talaris-cross-host",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"observed\": {\"http://127.0.0.1:3110/api/health\": \"200\", \"http://127.0.0.1:8078/health\": \"200\", \"http://127.0.0.1:8082/api/health\": \"200\", \"http://127.0.0.1:8700/api/runs\": \"200\"}, \"returncode\": 0, \"stderr\": \"\"} PASS: Talaris and all four cross-host/tunnel surfaces are healthy"
+        },
+        {
+          "key": "canonical-work-state",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"bead_status\": \"in_progress\", \"beads_summary\": {\"average_lead_time_hours\": 0, \"blocked_issues\": 22, \"closed_issues\": 204, \"deferred_issues\": 5, \"epics_eligible_for_closure\": 0, \"in_progress_issues\": 12, \"open_issues\": 37, \"pinned_issues\": 0, \"ready_issues\": 15, \"total_issues\": 268}, \"errors\": [], \"paperclip_status\": \"in_progress\"} PASS: canonical Beads and Paperclip work-state records are readable and active"
+        },
+        {
+          "key": "owned-ringer-fork",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"fleet_remote\": \"https://github.com/JackReis/ringer-fleet.git\", \"head\": \"47ccc11d416b057e1f46f2a93ca6c9f8efd2421c\", \"launcher\": \"usage: ringer.py [-h] [--config CONFIG]\"} PASS: fleet-owned Ringer fork and pinned Python 3.12 launcher are operational"
+        }
+      ]
+    },
+    {
+      "cycle": 2,
+      "clean": true,
+      "run_id": "fleet-clean-streak-02-20260714T190340Z-p99245",
+      "state_path": "/Users/hermes/.ringer/runs/fleet-clean-streak-02-20260714T190340Z-p99245.json",
+      "artifact_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-02-20260714T190340Z-p99245.html",
+      "report_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-02-20260714T190340Z-p99245-report.html",
+      "summary": {
+        "fail": 0,
+        "pass": 4,
+        "tokens": 0
+      },
+      "tasks": [
+        {
+          "key": "aegis-control-plane",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"results\": {\"bifrost\": {\"json_type\": \"dict\", \"status\": 200}, \"hindsight\": {\"json_type\": \"dict\", \"status\": 200}, \"openbrain\": {\"json_type\": \"dict\", \"status\": 200}, \"paperclip\": {\"json_type\": \"dict\", \"status\": 200}, \"ringside\": {\"json_type\": \"dict\", \"status\": 200}}} PASS: all five Aegis control-plane endpoints returned HTTP 200 with JSON"
+        },
+        {
+          "key": "talaris-cross-host",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"observed\": {\"http://127.0.0.1:3110/api/health\": \"200\", \"http://127.0.0.1:8078/health\": \"200\", \"http://127.0.0.1:8082/api/health\": \"200\", \"http://127.0.0.1:8700/api/runs\": \"200\"}, \"returncode\": 0, \"stderr\": \"\"} PASS: Talaris and all four cross-host/tunnel surfaces are healthy"
+        },
+        {
+          "key": "canonical-work-state",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"bead_status\": \"in_progress\", \"beads_summary\": {\"average_lead_time_hours\": 0, \"blocked_issues\": 22, \"closed_issues\": 204, \"deferred_issues\": 5, \"epics_eligible_for_closure\": 0, \"in_progress_issues\": 12, \"open_issues\": 37, \"pinned_issues\": 0, \"ready_issues\": 15, \"total_issues\": 268}, \"errors\": [], \"paperclip_status\": \"in_progress\"} PASS: canonical Beads and Paperclip work-state records are readable and active"
+        },
+        {
+          "key": "owned-ringer-fork",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"fleet_remote\": \"https://github.com/JackReis/ringer-fleet.git\", \"head\": \"47ccc11d416b057e1f46f2a93ca6c9f8efd2421c\", \"launcher\": \"usage: ringer.py [-h] [--config CONFIG]\"} PASS: fleet-owned Ringer fork and pinned Python 3.12 launcher are operational"
+        }
+      ]
+    },
+    {
+      "cycle": 3,
+      "clean": true,
+      "run_id": "fleet-clean-streak-03-20260714T190352Z-p99376",
+      "state_path": "/Users/hermes/.ringer/runs/fleet-clean-streak-03-20260714T190352Z-p99376.json",
+      "artifact_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-03-20260714T190352Z-p99376.html",
+      "report_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-03-20260714T190352Z-p99376-report.html",
+      "summary": {
+        "fail": 0,
+        "pass": 4,
+        "tokens": 0
+      },
+      "tasks": [
+        {
+          "key": "aegis-control-plane",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"results\": {\"bifrost\": {\"json_type\": \"dict\", \"status\": 200}, \"hindsight\": {\"json_type\": \"dict\", \"status\": 200}, \"openbrain\": {\"json_type\": \"dict\", \"status\": 200}, \"paperclip\": {\"json_type\": \"dict\", \"status\": 200}, \"ringside\": {\"json_type\": \"dict\", \"status\": 200}}} PASS: all five Aegis control-plane endpoints returned HTTP 200 with JSON"
+        },
+        {
+          "key": "talaris-cross-host",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"observed\": {\"http://127.0.0.1:3110/api/health\": \"200\", \"http://127.0.0.1:8078/health\": \"200\", \"http://127.0.0.1:8082/api/health\": \"200\", \"http://127.0.0.1:8700/api/runs\": \"200\"}, \"returncode\": 0, \"stderr\": \"\"} PASS: Talaris and all four cross-host/tunnel surfaces are healthy"
+        },
+        {
+          "key": "canonical-work-state",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"bead_status\": \"in_progress\", \"beads_summary\": {\"average_lead_time_hours\": 0, \"blocked_issues\": 22, \"closed_issues\": 204, \"deferred_issues\": 5, \"epics_eligible_for_closure\": 0, \"in_progress_issues\": 12, \"open_issues\": 37, \"pinned_issues\": 0, \"ready_issues\": 15, \"total_issues\": 268}, \"errors\": [], \"paperclip_status\": \"in_progress\"} PASS: canonical Beads and Paperclip work-state records are readable and active"
+        },
+        {
+          "key": "owned-ringer-fork",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"fleet_remote\": \"https://github.com/JackReis/ringer-fleet.git\", \"head\": \"47ccc11d416b057e1f46f2a93ca6c9f8efd2421c\", \"launcher\": \"usage: ringer.py [-h] [--config CONFIG]\"} PASS: fleet-owned Ringer fork and pinned Python 3.12 launcher are operational"
+        }
+      ]
+    },
+    {
+      "cycle": 4,
+      "clean": true,
+      "run_id": "fleet-clean-streak-04-20260714T190404Z-p99560",
+      "state_path": "/Users/hermes/.ringer/runs/fleet-clean-streak-04-20260714T190404Z-p99560.json",
+      "artifact_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-04-20260714T190404Z-p99560.html",
+      "report_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-04-20260714T190404Z-p99560-report.html",
+      "summary": {
+        "fail": 0,
+        "pass": 4,
+        "tokens": 0
+      },
+      "tasks": [
+        {
+          "key": "aegis-control-plane",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"results\": {\"bifrost\": {\"json_type\": \"dict\", \"status\": 200}, \"hindsight\": {\"json_type\": \"dict\", \"status\": 200}, \"openbrain\": {\"json_type\": \"dict\", \"status\": 200}, \"paperclip\": {\"json_type\": \"dict\", \"status\": 200}, \"ringside\": {\"json_type\": \"dict\", \"status\": 200}}} PASS: all five Aegis control-plane endpoints returned HTTP 200 with JSON"
+        },
+        {
+          "key": "talaris-cross-host",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"observed\": {\"http://127.0.0.1:3110/api/health\": \"200\", \"http://127.0.0.1:8078/health\": \"200\", \"http://127.0.0.1:8082/api/health\": \"200\", \"http://127.0.0.1:8700/api/runs\": \"200\"}, \"returncode\": 0, \"stderr\": \"\"} PASS: Talaris and all four cross-host/tunnel surfaces are healthy"
+        },
+        {
+          "key": "canonical-work-state",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"bead_status\": \"in_progress\", \"beads_summary\": {\"average_lead_time_hours\": 0, \"blocked_issues\": 22, \"closed_issues\": 204, \"deferred_issues\": 5, \"epics_eligible_for_closure\": 0, \"in_progress_issues\": 12, \"open_issues\": 37, \"pinned_issues\": 0, \"ready_issues\": 15, \"total_issues\": 268}, \"errors\": [], \"paperclip_status\": \"in_progress\"} PASS: canonical Beads and Paperclip work-state records are readable and active"
+        },
+        {
+          "key": "owned-ringer-fork",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"fleet_remote\": \"https://github.com/JackReis/ringer-fleet.git\", \"head\": \"47ccc11d416b057e1f46f2a93ca6c9f8efd2421c\", \"launcher\": \"usage: ringer.py [-h] [--config CONFIG]\"} PASS: fleet-owned Ringer fork and pinned Python 3.12 launcher are operational"
+        }
+      ]
+    },
+    {
+      "cycle": 5,
+      "clean": true,
+      "run_id": "fleet-clean-streak-05-20260714T190416Z-p99726",
+      "state_path": "/Users/hermes/.ringer/runs/fleet-clean-streak-05-20260714T190416Z-p99726.json",
+      "artifact_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-05-20260714T190416Z-p99726.html",
+      "report_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-05-20260714T190416Z-p99726-report.html",
+      "summary": {
+        "fail": 0,
+        "pass": 4,
+        "tokens": 0
+      },
+      "tasks": [
+        {
+          "key": "aegis-control-plane",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"results\": {\"bifrost\": {\"json_type\": \"dict\", \"status\": 200}, \"hindsight\": {\"json_type\": \"dict\", \"status\": 200}, \"openbrain\": {\"json_type\": \"dict\", \"status\": 200}, \"paperclip\": {\"json_type\": \"dict\", \"status\": 200}, \"ringside\": {\"json_type\": \"dict\", \"status\": 200}}} PASS: all five Aegis control-plane endpoints returned HTTP 200 with JSON"
+        },
+        {
+          "key": "talaris-cross-host",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"observed\": {\"http://127.0.0.1:3110/api/health\": \"200\", \"http://127.0.0.1:8078/health\": \"200\", \"http://127.0.0.1:8082/api/health\": \"200\", \"http://127.0.0.1:8700/api/runs\": \"200\"}, \"returncode\": 0, \"stderr\": \"\"} PASS: Talaris and all four cross-host/tunnel surfaces are healthy"
+        },
+        {
+          "key": "canonical-work-state",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"bead_status\": \"in_progress\", \"beads_summary\": {\"average_lead_time_hours\": 0, \"blocked_issues\": 22, \"closed_issues\": 204, \"deferred_issues\": 5, \"epics_eligible_for_closure\": 0, \"in_progress_issues\": 12, \"open_issues\": 37, \"pinned_issues\": 0, \"ready_issues\": 15, \"total_issues\": 268}, \"errors\": [], \"paperclip_status\": \"in_progress\"} PASS: canonical Beads and Paperclip work-state records are readable and active"
+        },
+        {
+          "key": "owned-ringer-fork",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"fleet_remote\": \"https://github.com/JackReis/ringer-fleet.git\", \"head\": \"47ccc11d416b057e1f46f2a93ca6c9f8efd2421c\", \"launcher\": \"usage: ringer.py [-h] [--config CONFIG]\"} PASS: fleet-owned Ringer fork and pinned Python 3.12 launcher are operational"
+        }
+      ]
+    },
+    {
+      "cycle": 6,
+      "clean": true,
+      "run_id": "fleet-clean-streak-06-20260714T190428Z-p99841",
+      "state_path": "/Users/hermes/.ringer/runs/fleet-clean-streak-06-20260714T190428Z-p99841.json",
+      "artifact_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-06-20260714T190428Z-p99841.html",
+      "report_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-06-20260714T190428Z-p99841-report.html",
+      "summary": {
+        "fail": 0,
+        "pass": 4,
+        "tokens": 0
+      },
+      "tasks": [
+        {
+          "key": "aegis-control-plane",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"results\": {\"bifrost\": {\"json_type\": \"dict\", \"status\": 200}, \"hindsight\": {\"json_type\": \"dict\", \"status\": 200}, \"openbrain\": {\"json_type\": \"dict\", \"status\": 200}, \"paperclip\": {\"json_type\": \"dict\", \"status\": 200}, \"ringside\": {\"json_type\": \"dict\", \"status\": 200}}} PASS: all five Aegis control-plane endpoints returned HTTP 200 with JSON"
+        },
+        {
+          "key": "talaris-cross-host",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"observed\": {\"http://127.0.0.1:3110/api/health\": \"200\", \"http://127.0.0.1:8078/health\": \"200\", \"http://127.0.0.1:8082/api/health\": \"200\", \"http://127.0.0.1:8700/api/runs\": \"200\"}, \"returncode\": 0, \"stderr\": \"\"} PASS: Talaris and all four cross-host/tunnel surfaces are healthy"
+        },
+        {
+          "key": "canonical-work-state",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"bead_status\": \"in_progress\", \"beads_summary\": {\"average_lead_time_hours\": 0, \"blocked_issues\": 22, \"closed_issues\": 204, \"deferred_issues\": 5, \"epics_eligible_for_closure\": 0, \"in_progress_issues\": 12, \"open_issues\": 37, \"pinned_issues\": 0, \"ready_issues\": 15, \"total_issues\": 268}, \"errors\": [], \"paperclip_status\": \"in_progress\"} PASS: canonical Beads and Paperclip work-state records are readable and active"
+        },
+        {
+          "key": "owned-ringer-fork",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"fleet_remote\": \"https://github.com/JackReis/ringer-fleet.git\", \"head\": \"47ccc11d416b057e1f46f2a93ca6c9f8efd2421c\", \"launcher\": \"usage: ringer.py [-h] [--config CONFIG]\"} PASS: fleet-owned Ringer fork and pinned Python 3.12 launcher are operational"
+        }
+      ]
+    },
+    {
+      "cycle": 7,
+      "clean": true,
+      "run_id": "fleet-clean-streak-07-20260714T190440Z-p99972",
+      "state_path": "/Users/hermes/.ringer/runs/fleet-clean-streak-07-20260714T190440Z-p99972.json",
+      "artifact_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-07-20260714T190440Z-p99972.html",
+      "report_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-07-20260714T190440Z-p99972-report.html",
+      "summary": {
+        "fail": 0,
+        "pass": 4,
+        "tokens": 0
+      },
+      "tasks": [
+        {
+          "key": "aegis-control-plane",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"results\": {\"bifrost\": {\"json_type\": \"dict\", \"status\": 200}, \"hindsight\": {\"json_type\": \"dict\", \"status\": 200}, \"openbrain\": {\"json_type\": \"dict\", \"status\": 200}, \"paperclip\": {\"json_type\": \"dict\", \"status\": 200}, \"ringside\": {\"json_type\": \"dict\", \"status\": 200}}} PASS: all five Aegis control-plane endpoints returned HTTP 200 with JSON"
+        },
+        {
+          "key": "talaris-cross-host",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"observed\": {\"http://127.0.0.1:3110/api/health\": \"200\", \"http://127.0.0.1:8078/health\": \"200\", \"http://127.0.0.1:8082/api/health\": \"200\", \"http://127.0.0.1:8700/api/runs\": \"200\"}, \"returncode\": 0, \"stderr\": \"\"} PASS: Talaris and all four cross-host/tunnel surfaces are healthy"
+        },
+        {
+          "key": "canonical-work-state",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"bead_status\": \"in_progress\", \"beads_summary\": {\"average_lead_time_hours\": 0, \"blocked_issues\": 22, \"closed_issues\": 204, \"deferred_issues\": 5, \"epics_eligible_for_closure\": 0, \"in_progress_issues\": 12, \"open_issues\": 37, \"pinned_issues\": 0, \"ready_issues\": 15, \"total_issues\": 268}, \"errors\": [], \"paperclip_status\": \"in_progress\"} PASS: canonical Beads and Paperclip work-state records are readable and active"
+        },
+        {
+          "key": "owned-ringer-fork",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"fleet_remote\": \"https://github.com/JackReis/ringer-fleet.git\", \"head\": \"47ccc11d416b057e1f46f2a93ca6c9f8efd2421c\", \"launcher\": \"usage: ringer.py [-h] [--config CONFIG]\"} PASS: fleet-owned Ringer fork and pinned Python 3.12 launcher are operational"
+        }
+      ]
+    },
+    {
+      "cycle": 8,
+      "clean": true,
+      "run_id": "fleet-clean-streak-08-20260714T190453Z-p265",
+      "state_path": "/Users/hermes/.ringer/runs/fleet-clean-streak-08-20260714T190453Z-p265.json",
+      "artifact_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-08-20260714T190453Z-p265.html",
+      "report_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-08-20260714T190453Z-p265-report.html",
+      "summary": {
+        "fail": 0,
+        "pass": 4,
+        "tokens": 0
+      },
+      "tasks": [
+        {
+          "key": "aegis-control-plane",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"results\": {\"bifrost\": {\"json_type\": \"dict\", \"status\": 200}, \"hindsight\": {\"json_type\": \"dict\", \"status\": 200}, \"openbrain\": {\"json_type\": \"dict\", \"status\": 200}, \"paperclip\": {\"json_type\": \"dict\", \"status\": 200}, \"ringside\": {\"json_type\": \"dict\", \"status\": 200}}} PASS: all five Aegis control-plane endpoints returned HTTP 200 with JSON"
+        },
+        {
+          "key": "talaris-cross-host",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"observed\": {\"http://127.0.0.1:3110/api/health\": \"200\", \"http://127.0.0.1:8078/health\": \"200\", \"http://127.0.0.1:8082/api/health\": \"200\", \"http://127.0.0.1:8700/api/runs\": \"200\"}, \"returncode\": 0, \"stderr\": \"\"} PASS: Talaris and all four cross-host/tunnel surfaces are healthy"
+        },
+        {
+          "key": "canonical-work-state",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"bead_status\": \"in_progress\", \"beads_summary\": {\"average_lead_time_hours\": 0, \"blocked_issues\": 22, \"closed_issues\": 204, \"deferred_issues\": 5, \"epics_eligible_for_closure\": 0, \"in_progress_issues\": 12, \"open_issues\": 37, \"pinned_issues\": 0, \"ready_issues\": 15, \"total_issues\": 268}, \"errors\": [], \"paperclip_status\": \"in_progress\"} PASS: canonical Beads and Paperclip work-state records are readable and active"
+        },
+        {
+          "key": "owned-ringer-fork",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"fleet_remote\": \"https://github.com/JackReis/ringer-fleet.git\", \"head\": \"47ccc11d416b057e1f46f2a93ca6c9f8efd2421c\", \"launcher\": \"usage: ringer.py [-h] [--config CONFIG]\"} PASS: fleet-owned Ringer fork and pinned Python 3.12 launcher are operational"
+        }
+      ]
+    },
+    {
+      "cycle": 9,
+      "clean": true,
+      "run_id": "fleet-clean-streak-09-20260714T190505Z-p472",
+      "state_path": "/Users/hermes/.ringer/runs/fleet-clean-streak-09-20260714T190505Z-p472.json",
+      "artifact_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-09-20260714T190505Z-p472.html",
+      "report_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-09-20260714T190505Z-p472-report.html",
+      "summary": {
+        "fail": 0,
+        "pass": 4,
+        "tokens": 0
+      },
+      "tasks": [
+        {
+          "key": "aegis-control-plane",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"results\": {\"bifrost\": {\"json_type\": \"dict\", \"status\": 200}, \"hindsight\": {\"json_type\": \"dict\", \"status\": 200}, \"openbrain\": {\"json_type\": \"dict\", \"status\": 200}, \"paperclip\": {\"json_type\": \"dict\", \"status\": 200}, \"ringside\": {\"json_type\": \"dict\", \"status\": 200}}} PASS: all five Aegis control-plane endpoints returned HTTP 200 with JSON"
+        },
+        {
+          "key": "talaris-cross-host",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"observed\": {\"http://127.0.0.1:3110/api/health\": \"200\", \"http://127.0.0.1:8078/health\": \"200\", \"http://127.0.0.1:8082/api/health\": \"200\", \"http://127.0.0.1:8700/api/runs\": \"200\"}, \"returncode\": 0, \"stderr\": \"\"} PASS: Talaris and all four cross-host/tunnel surfaces are healthy"
+        },
+        {
+          "key": "canonical-work-state",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"bead_status\": \"in_progress\", \"beads_summary\": {\"average_lead_time_hours\": 0, \"blocked_issues\": 22, \"closed_issues\": 204, \"deferred_issues\": 5, \"epics_eligible_for_closure\": 0, \"in_progress_issues\": 12, \"open_issues\": 37, \"pinned_issues\": 0, \"ready_issues\": 15, \"total_issues\": 268}, \"errors\": [], \"paperclip_status\": \"in_progress\"} PASS: canonical Beads and Paperclip work-state records are readable and active"
+        },
+        {
+          "key": "owned-ringer-fork",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"fleet_remote\": \"https://github.com/JackReis/ringer-fleet.git\", \"head\": \"47ccc11d416b057e1f46f2a93ca6c9f8efd2421c\", \"launcher\": \"usage: ringer.py [-h] [--config CONFIG]\"} PASS: fleet-owned Ringer fork and pinned Python 3.12 launcher are operational"
+        }
+      ]
+    },
+    {
+      "cycle": 10,
+      "clean": true,
+      "run_id": "fleet-clean-streak-10-20260714T190518Z-p588",
+      "state_path": "/Users/hermes/.ringer/runs/fleet-clean-streak-10-20260714T190518Z-p588.json",
+      "artifact_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-10-20260714T190518Z-p588.html",
+      "report_path": "/Users/hermes/.ringer/artifacts/fleet-clean-streak-10-20260714T190518Z-p588-report.html",
+      "summary": {
+        "fail": 0,
+        "pass": 4,
+        "tokens": 0
+      },
+      "tasks": [
+        {
+          "key": "aegis-control-plane",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"results\": {\"bifrost\": {\"json_type\": \"dict\", \"status\": 200}, \"hindsight\": {\"json_type\": \"dict\", \"status\": 200}, \"openbrain\": {\"json_type\": \"dict\", \"status\": 200}, \"paperclip\": {\"json_type\": \"dict\", \"status\": 200}, \"ringside\": {\"json_type\": \"dict\", \"status\": 200}}} PASS: all five Aegis control-plane endpoints returned HTTP 200 with JSON"
+        },
+        {
+          "key": "talaris-cross-host",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"observed\": {\"http://127.0.0.1:3110/api/health\": \"200\", \"http://127.0.0.1:8078/health\": \"200\", \"http://127.0.0.1:8082/api/health\": \"200\", \"http://127.0.0.1:8700/api/runs\": \"200\"}, \"returncode\": 0, \"stderr\": \"\"} PASS: Talaris and all four cross-host/tunnel surfaces are healthy"
+        },
+        {
+          "key": "canonical-work-state",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"bead_status\": \"in_progress\", \"beads_summary\": {\"average_lead_time_hours\": 0, \"blocked_issues\": 22, \"closed_issues\": 204, \"deferred_issues\": 5, \"epics_eligible_for_closure\": 0, \"in_progress_issues\": 12, \"open_issues\": 37, \"pinned_issues\": 0, \"ready_issues\": 15, \"total_issues\": 268}, \"errors\": [], \"paperclip_status\": \"in_progress\"} PASS: canonical Beads and Paperclip work-state records are readable and active"
+        },
+        {
+          "key": "owned-ringer-fork",
+          "status": "pass",
+          "verdict": "PASS",
+          "attempts": 1,
+          "check_returncode": 0,
+          "check_output_tail": "{\"errors\": [], \"fleet_remote\": \"https://github.com/JackReis/ringer-fleet.git\", \"head\": \"47ccc11d416b057e1f46f2a93ca6c9f8efd2421c\", \"launcher\": \"usage: ringer.py [-h] [--config CONFIG]\"} PASS: fleet-owned Ringer fork and pinned Python 3.12 launcher are operational"
+        }
+      ]
+    }
+  ],
+  "current_streak": 10,
+  "finished_at": "2026-07-14T19:05:19.912226+00:00"
+}
