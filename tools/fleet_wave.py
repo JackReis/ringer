@@ -11,9 +11,16 @@ def verification_env(temp_home):
  return {'PATH':'/usr/bin:/bin','HOME':str(temp_home),'TMPDIR':str(temp_home),'LANG':'C','LC_ALL':'C','TZ':'UTC'}
 def _seatbelt_quote(path):return '"'+str(Path(path).resolve()).replace('\\','\\\\').replace('"','\\"')+'"'
 def sandbox_profile(cwd,temp_home):
- reads=['/usr','/bin','/System','/Library','/private/etc','/private/var/db','/dev',cwd,temp_home]
- writes=[cwd,temp_home]
- return '\n'.join(['(version 1)','(deny default)','(deny network*)','(allow process*)','(allow file-read-metadata)',f"(allow file-read-data {' '.join(f'(subpath {_seatbelt_quote(x)})' for x in reads)})",f"(allow file-write* {' '.join(f'(subpath {_seatbelt_quote(x)})' for x in writes)})",''])
+ # macOS 26 aborts sandbox-exec when deny-default profiles use filtered
+ # file-read-data allows. Permit reads generally, then deny credential/user
+ # roots and carve back only the isolated fixture and temporary home.
+ denied_reads=['/Users','/Volumes','/Network','/opt','/private/tmp','/private/var/folders','/private/var/tmp','/Library/Keychains']
+ reads=[cwd,temp_home];writes=[cwd,temp_home]
+ lines=['(version 1)','(deny default)','(deny network*)','(allow process*)','(allow file-read*)']
+ lines += [f'(deny file-read* (subpath {_seatbelt_quote(x)}))' for x in denied_reads]
+ lines += [f'(allow file-read* (subpath {_seatbelt_quote(x)}))' for x in reads]
+ lines += [f"(allow file-write* {' '.join(f'(subpath {_seatbelt_quote(x)})' for x in writes)})",'']
+ return '\n'.join(lines)
 def sandboxed_shell(command,cwd,temp_home,sandbox_bin):
  cwd=Path(cwd).resolve();home=Path(temp_home).resolve()
  if not sandbox_bin:raise ProtocolError('sandbox backend required on this platform')
