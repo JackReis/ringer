@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ringer.dev/schema/provider-protocol.v1.json",
+  "title": "Ringer Provider Protocol v1",
+  "description": "External transport metadata enclosing an independently validated context-packet.v1 payload.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol_version", "envelope_id", "provider_id", "model_id", "request_id", "packet"],
+  "properties": {
+    "protocol_version": {"const": "provider-protocol.v1"},
+    "envelope_id": {"$ref": "#/$defs/id"},
+    "provider_id": {"$ref": "#/$defs/id"},
+    "model_id": {"$ref": "#/$defs/id"},
+    "request_id": {"$ref": "#/$defs/id"},
+    "packet": {"$ref": "context-packet.v1.json"}
+  },
+  "$defs": {"id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}}
+}
