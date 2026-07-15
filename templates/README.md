@@ -37,3 +37,5 @@ Standard kit files are `manifest.json`, `README.md`, and usually one or more exe
 ## Craft Floor
 
 Every spec opens with the worker's role and boundary, names what it owns, and states what it must not touch. Checks print why they fail, not just that they failed. Declare deliverables in `expect_files` so the artifact page has the real outputs. When worktrees are doomed after success, deliverables and patch exports land outside those worktrees before the check passes.
+
+Templates may add an optional per-task `context_packet` path when a worker needs prebuilt evidence. Keep the inline `spec` authoritative; packet paths are manifest-relative and are strictly preflighted before the run starts.

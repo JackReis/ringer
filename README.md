@@ -94,6 +94,7 @@ Each task gets its own directory, its own worker, its own log, and its own verdi
 |---|---|
 | `key` | Task name — becomes the working subdirectory and the label everywhere |
 | `spec` | The prompt handed to the worker |
+| `context_packet` | Optional path to a sealed `context-packet.v1` evidence snapshot. Relative paths are resolved against the manifest file, never the current or task directory; absolute paths resolve normally. An intentionally declared leaf or parent symlink is canonicalized once while parsing the manifest; packet acquisition then pins that resolved target component-by-component and rejects later symlink substitution. |
 | `check` | Shell command run after the worker exits; exit 0 = PASS |
 | `expect_files` | Files that must exist and be non-empty before the check runs |
 | `engine` | Which configured engine runs this task (default `codex`) |
@@ -106,6 +107,10 @@ Each task gets its own directory, its own worker, its own log, and its own verdi
 | `worktrees` (run-level) | Give each task an isolated git worktree of `repo` so parallel workers can't collide |
 
 > **Worktree footgun:** on PASS the task's worktree is removed — including anything written inside it. In worktrees mode, worker logs live outside task worktrees in `workdir/logs/`; have workers write deliverables outside the worktree too, or have your `check` copy artifacts out before it exits 0.
+
+Context packets are untrusted evidence, not worker instructions: the inline `spec` remains required and authoritative. `lint`, `run --dry-run`, and `run` strictly validate every declared packet's shape, integrity, timestamps, and freshness before any worker, check, worktree, HUD, active-run, or eval side effect. A missing, unreadable, oversized, malformed, tampered, stale, future, or unsupported packet fails the command with exit 2. Ringer snapshots and renders each valid packet once, then reuses that exact base prompt and digest on retries even if the source file changes. Dry-run shows the resolved path and safe provenance metadata plus the actual rendered worker command. SHA-256 detects mutation; it does not authenticate the evidence source.
+
+Ringer consumes sealed packet files; provider retrieval, transport, authentication, and packet production belong to the ideal provider lane and are intentionally outside this quick lane.
 
 Not sure what your tasks even are yet? [`docs/interview-prompt.md`](docs/interview-prompt.md) is a prompt you paste into any chatbot; it interviews you about the job and hands back a brief your orchestrating agent can turn into a manifest. Ready-made skeletons for the patterns that work live in [`templates/`](templates/).
 

@@ -5,14 +5,18 @@ import argparse
 import asyncio
 import base64
 import contextlib
+import hashlib
+import hmac
 import json
 import mimetypes
 import os
 import re
+import secrets
 import shlex
 import signal
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 
@@ -33,6 +37,7 @@ import tomllib
 import urllib.parse
 import urllib.request
 import webbrowser
+import context_packet as context_packet_contract
 from dataclasses import dataclass, field, replace as dataclass_replace
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -621,6 +626,24 @@ def load_engines(raw: Any) -> dict[str, EngineConfig]:
     return engines
 
 
+def resolve_context_packet_path(
+    raw: object,
+    *,
+    manifest_dir: Path | None,
+    task_key: str,
+) -> Path:
+    if not isinstance(raw, str) or not raw.strip():
+        raise ValueError(f"task {task_key}: context_packet must be a nonblank string")
+    candidate = Path(raw.strip()).expanduser()
+    if not candidate.is_absolute():
+        if manifest_dir is None:
+            raise ValueError(
+                f"task {task_key}: relative context_packet requires manifest_dir"
+            )
+        candidate = manifest_dir.expanduser().resolve() / candidate
+    return candidate.resolve()
+
+
 @dataclass(frozen=True)
 class TaskSpec:
     key: str
@@ -636,9 +659,10 @@ class TaskSpec:
     # engine's {model} placeholder); empty means the engine's model_default.
     model: str = ""
     task_type: str = ""
+    context_packet: Path | None = None
 
     @classmethod
-    def from_obj(cls, obj: dict[str, Any]) -> "TaskSpec":
+    def from_obj(cls, obj: dict[str, Any], *, manifest_dir: Path | None = None) -> "TaskSpec":
         key_raw = obj.get("key", "")
         if not isinstance(key_raw, str):
             raise ValueError("task key must be a string")
@@ -676,6 +700,9 @@ class TaskSpec:
         task_type = obj.get("task_type", "")
         if not isinstance(task_type, str):
             raise ValueError(f"task {key}: task_type must be a string")
+        context_packet = resolve_context_packet_path(
+            obj["context_packet"], manifest_dir=manifest_dir, task_key=key
+        ) if "context_packet" in obj else None
         return cls(
             key=key,
             spec=spec,
@@ -688,6 +715,7 @@ class TaskSpec:
             verified=verified.strip(),
             model=model.strip(),
             task_type=task_type.strip(),
+            context_packet=context_packet,
         )
 
 
@@ -703,10 +731,11 @@ class Manifest:
 
     @classmethod
     def from_path(cls, path: Path) -> "Manifest":
+        path = path.expanduser().resolve()
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             raise ValueError("manifest root must be a JSON object")
-        manifest = cls.from_obj(data)
+        manifest = cls.from_obj(data, manifest_dir=path.parent)
         return cls(
             run_name=manifest.run_name,
             workdir=manifest.workdir,
@@ -718,7 +747,7 @@ class Manifest:
         )
 
     @classmethod
-    def from_obj(cls, obj: dict[str, Any]) -> "Manifest":
+    def from_obj(cls, obj: dict[str, Any], *, manifest_dir: Path | None = None) -> "Manifest":
         run_name = str(obj.get("run_name", "")).strip()
         if not run_name:
             raise ValueError("run_name is required")
@@ -736,7 +765,10 @@ class Manifest:
         tasks_raw = obj.get("tasks")
         if not isinstance(tasks_raw, list) or not tasks_raw:
             raise ValueError("tasks must be a non-empty list")
-        tasks = tuple(TaskSpec.from_obj(task) for task in tasks_raw)
+        tasks = tuple(
+            TaskSpec.from_obj(task, manifest_dir=manifest_dir)
+            for task in tasks_raw
+        )
         keys = [task.key for task in tasks]
         duplicates = sorted({key for key in keys if keys.count(key) > 1})
         if duplicates:
@@ -777,6 +809,298 @@ class Manifest:
             tasks=self.tasks,
             source_path=self.source_path,
         )
+
+
+@dataclass(frozen=True)
+class PreparedContextPacket:
+    """Prepared packet prompt with an in-process integrity capability.
+
+    The private attestation binds the prepared values to this process's
+    preflight result. It is not serialized and is not an OS trust boundary.
+    """
+
+    path: Path
+    rendered_prompt: str
+    schema_version: str
+    packet_sha256: str
+    created_at: str
+    expires_at: str
+    freshness_valid: bool = True
+    _attestation: bytes | None = field(default=None, init=False, repr=False, compare=False)
+
+    def metadata(self) -> dict[str, Any]:
+        return {
+            "resolved_path": str(self.path),
+            "schema_version": self.schema_version,
+            "packet_sha256": self.packet_sha256,
+            "created_at": self.created_at,
+            "expires_at": self.expires_at,
+            "freshness_valid": self.freshness_valid,
+        }
+
+
+_PREPARED_CONTEXT_HMAC_KEY = secrets.token_bytes(32)
+_OS_OPEN_SUPPORTS_DIR_FD = os.open in getattr(os, "supports_dir_fd", ())
+
+
+def _prepared_context_attestation(context: PreparedContextPacket) -> bytes:
+    payload = json.dumps(
+        {
+            "resolved_path": str(context.path),
+            "rendered_prompt": context.rendered_prompt,
+            "schema_version": context.schema_version,
+            "packet_sha256": context.packet_sha256,
+            "created_at": context.created_at,
+            "expires_at": context.expires_at,
+            "freshness_valid": context.freshness_valid,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hmac.new(_PREPARED_CONTEXT_HMAC_KEY, payload, hashlib.sha256).digest()
+
+
+def _read_context_packet_from_fd(fd: int) -> bytes:
+    file_stat = os.fstat(fd)
+    if not stat.S_ISREG(file_stat.st_mode):
+        raise ValueError("packet path is missing or not a regular file")
+    if file_stat.st_size > context_packet_contract.MAX_WIRE_BYTES:
+        raise ValueError(
+            f"packet exceeds {context_packet_contract.MAX_WIRE_BYTES} bytes"
+        )
+    raw = os.read(fd, context_packet_contract.MAX_WIRE_BYTES + 1)
+    if len(raw) > context_packet_contract.MAX_WIRE_BYTES:
+        raise ValueError(
+            f"packet exceeds {context_packet_contract.MAX_WIRE_BYTES} bytes"
+        )
+    return raw
+
+
+def _read_context_packet_bytes_fallback(path: Path) -> bytes:
+    """Compatibility path for platforms whose os.open lacks dir_fd support.
+
+    The supported macOS host uses the component-pinned path below. This fallback
+    retains final-component O_NOFOLLOW and bounded descriptor reads for older
+    Python/platform combinations, but is not a substitute for directory-fd
+    pinning when that facility is available.
+    """
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
+    fd: int | None = None
+    try:
+        fd = os.open(str(path), flags)
+        return _read_context_packet_from_fd(fd)
+    except ValueError:
+        raise
+    except OSError as exc:
+        raise ValueError("packet path is missing or not a regular file") from exc
+    finally:
+        if fd is not None:
+            with contextlib.suppress(OSError):
+                os.close(fd)
+
+
+def _read_context_packet_bytes(path: Path) -> bytes:
+    """Read one bounded packet snapshot through pinned directory descriptors."""
+    if not _OS_OPEN_SUPPORTS_DIR_FD:
+        return _read_context_packet_bytes_fallback(path)
+
+    components = path.parts
+    if not path.is_absolute() or len(components) < 2:
+        raise ValueError("packet path is missing or not a regular file")
+
+    directory_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
+    leaf_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
+    directory_fd: int | None = None
+    leaf_fd: int | None = None
+    try:
+        # Pin the root first; every later component is opened relative to the
+        # currently pinned directory and protected from symlink traversal.
+        directory_fd = os.open(components[0], directory_flags)
+        for component in components[1:-1]:
+            next_fd = os.open(component, directory_flags, dir_fd=directory_fd)
+            previous_fd = directory_fd
+            try:
+                os.close(previous_fd)
+            except BaseException:
+                with contextlib.suppress(OSError):
+                    os.close(next_fd)
+                raise
+            directory_fd = next_fd
+
+        leaf_fd = os.open(components[-1], leaf_flags, dir_fd=directory_fd)
+        return _read_context_packet_from_fd(leaf_fd)
+    except ValueError:
+        raise
+    except OSError as exc:
+        raise ValueError("packet path is missing or not a regular file") from exc
+    finally:
+        if leaf_fd is not None:
+            with contextlib.suppress(OSError):
+                os.close(leaf_fd)
+        if directory_fd is not None:
+            with contextlib.suppress(OSError):
+                os.close(directory_fd)
+
+
+def prepare_context_packets(
+    manifest: Manifest,
+    *,
+    now: datetime | None = None,
+) -> dict[str, PreparedContextPacket]:
+    """Strictly prepare every manifest-declared context packet before a run."""
+    clock = now or datetime.now(timezone.utc)
+    prepared: dict[str, PreparedContextPacket] = {}
+    prepared_by_path: dict[Path, PreparedContextPacket] = {}
+    failure_by_path: dict[Path, str] = {}
+    failures: list[tuple[str, Path, str]] = []
+    for task in manifest.tasks:
+        path = task.context_packet
+        if path is None:
+            continue
+        if not path.is_absolute():
+            path = path.resolve()
+        cached = prepared_by_path.get(path)
+        if cached is not None:
+            prepared[task.key] = cached
+            continue
+        cached_failure = failure_by_path.get(path)
+        if cached_failure is not None:
+            failures.append((task.key, path, cached_failure))
+            continue
+        try:
+            raw = _read_context_packet_bytes(path)
+            packet = context_packet_contract.loads_packet(
+                raw,
+                now=clock,
+                require_fresh=True,
+            )
+            rendered = context_packet_contract.render_prompt(
+                packet,
+                now=clock,
+                require_fresh=True,
+            )
+            integrity = packet["integrity"]
+            prepared_packet = PreparedContextPacket(
+                path=path,
+                rendered_prompt=rendered,
+                schema_version=packet["schema_version"],
+                packet_sha256=integrity["packet_sha256"],
+                created_at=packet["created_at"],
+                expires_at=packet["expires_at"],
+            )
+            object.__setattr__(
+                prepared_packet,
+                "_attestation",
+                _prepared_context_attestation(prepared_packet),
+            )
+            prepared_by_path[path] = prepared_packet
+            prepared[task.key] = prepared_packet
+        except Exception as exc:
+            failure = str(exc)
+            failure_by_path[path] = failure
+            failures.append((task.key, path, failure))
+    if failures:
+        details = "; ".join(
+            f"task {task_key}: {path}: {message}"
+            for task_key, path, message in sorted(failures, key=lambda item: item[0])
+        )
+        raise ValueError(f"context packet preflight failed: {details}")
+    return prepared
+
+
+def validate_prepared_contexts(
+    manifest: Manifest,
+    prepared_contexts: object,
+) -> dict[str, PreparedContextPacket]:
+    """Validate caller-supplied snapshots without rereading packet files."""
+    if not isinstance(prepared_contexts, dict):
+        raise ValueError("prepared_contexts must be a dict")
+
+    declared = {
+        task.key: task.context_packet.resolve()
+        for task in manifest.tasks
+        if task.context_packet is not None
+    }
+    actual_keys = set(prepared_contexts)
+    declared_keys = set(declared)
+    missing = sorted(declared_keys - actual_keys)
+    extra = sorted(actual_keys - declared_keys, key=str)
+    if missing or extra:
+        details: list[str] = []
+        if missing:
+            details.append(f"missing tasks: {', '.join(missing)}")
+        if extra:
+            details.append(f"extra tasks: {', '.join(map(str, extra))}")
+        raise ValueError(f"prepared_contexts map mismatch ({'; '.join(details)})")
+
+    validated: dict[str, PreparedContextPacket] = {}
+    for task in manifest.tasks:
+        expected_path = declared.get(task.key)
+        if expected_path is None:
+            continue
+        context = prepared_contexts[task.key]
+        if not isinstance(context, PreparedContextPacket):
+            raise ValueError(
+                f"prepared_contexts task {task.key}: invalid prepared context entry"
+            )
+        if context.path != expected_path:
+            raise ValueError(
+                f"prepared_contexts task {task.key}: packet path mismatch "
+                f"(expected {expected_path}, got {context.path})"
+            )
+        if (
+            not isinstance(context.rendered_prompt, str)
+            or not context.rendered_prompt
+            or context.schema_version != context_packet_contract.SCHEMA_VERSION
+            or not isinstance(context.packet_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", context.packet_sha256) is None
+            or not isinstance(context.created_at, str)
+            or not context.created_at
+            or not isinstance(context.expires_at, str)
+            or not context.expires_at
+            or context.freshness_valid is not True
+        ):
+            raise ValueError(
+                f"prepared_contexts task {task.key}: invalid prepared context shape"
+            )
+        if not isinstance(context._attestation, bytes) or not hmac.compare_digest(
+            _prepared_context_attestation(context), context._attestation
+        ):
+            raise ValueError(
+                f"prepared_contexts task {task.key}: invalid prepared context attestation"
+            )
+        validated[task.key] = context
+    return validated
+
+
+def compose_task_prompt(
+    spec: str,
+    context_packet: PreparedContextPacket | None,
+) -> str:
+    if context_packet is None:
+        return spec
+    return (
+        f"{context_packet.rendered_prompt}"
+        "[RINGER TASK SPEC]\n"
+        f"{spec}\n"
+        "[/RINGER TASK SPEC]\n"
+    )
 
 
 FILE_TEST_OPS = {"-e", "-f", "-s", "-d", "-r", "-w", "-x", "-L"}
@@ -1038,6 +1362,8 @@ class TaskRuntime:
     task: TaskSpec
     taskdir: Path
     log_path: Path
+    base_prompt: str = ""
+    context_packet: PreparedContextPacket | None = None
     report_paths: dict[str, Path] = field(default_factory=dict)
     deliverables: list[dict[str, Any]] = field(default_factory=list)
     deliverable_notes: list[str] = field(default_factory=list)
@@ -1078,6 +1404,17 @@ class VerifyResult:
     check_timed_out: bool
     raw_output_excerpt: str
     missing_files: tuple[str, ...] = ()
+
+
+def public_check_diagnostic(runtime: TaskRuntime, raw_output: str) -> str:
+    """Return raw legacy diagnostics, or metadata only for packet-backed tasks."""
+    if runtime.context_packet is None:
+        return raw_output
+    raw_bytes = raw_output.encode("utf-8")
+    return (
+        "[ringer.py] packet-backed check output omitted; "
+        f"utf8_bytes={len(raw_bytes)}; sha256={hashlib.sha256(raw_bytes).hexdigest()}"
+    )
 
 
 class ProcessTree:
@@ -1224,8 +1561,20 @@ class StateWriter:
         with self.lock:
             tasks = []
             for runtime in self.runtimes:
-                log_tail = tail_lines(runtime.log_path, line_count=3)
-                log_tail_full = tail_lines(runtime.log_path, line_count=40)
+                if runtime.context_packet is not None:
+                    receipt_pointer = (
+                        "[ringer.py] packet-backed worker log omitted from state receipt; "
+                        f"packet={runtime.context_packet.path}; "
+                        f"packet_sha256={runtime.context_packet.packet_sha256}; "
+                        f"raw_worker_log={runtime.log_path}"
+                    )
+                    log_tail = [receipt_pointer]
+                    log_tail_full = list(log_tail)
+                    activity = packet_runtime_activity(runtime.status, runtime.attempts)
+                else:
+                    log_tail = tail_lines(runtime.log_path, line_count=3)
+                    log_tail_full = tail_lines(runtime.log_path, line_count=40)
+                    activity = worker_activity(runtime.log_path, log_tail)
                 engine = self.engines.get(runtime.task.engine)
                 process_name = engine.process_name if engine else runtime.task.engine
                 task_state = {
@@ -1240,11 +1589,18 @@ class StateWriter:
                     ),
                     "spec": runtime.task.spec,
                     "spec_short": runtime.spec_short,
+                    "context_packet": (
+                        runtime.context_packet.metadata()
+                        if runtime.context_packet is not None
+                        else None
+                    ),
                     "verified": runtime.task.verified,
                     "check": runtime.task.check,
                     "check_returncode": runtime.last_check_returncode,
                     "check_timed_out": runtime.last_check_timed_out,
-                    "check_output_tail": shorten(runtime.last_check_output, 4000),
+                    "check_output_tail": shorten(
+                        public_check_diagnostic(runtime, runtime.last_check_output), 4000
+                    ),
                     "timeout_s": runtime.task.timeout_s,
                     "taskdir": str(runtime.taskdir),
                     "log_path": str(runtime.log_path),
@@ -1253,7 +1609,7 @@ class StateWriter:
                     },
                     "deliverables": [dict(item) for item in runtime.deliverables],
                     "deliverable_notes": list(runtime.deliverable_notes),
-                    "activity": worker_activity(runtime.log_path, log_tail),
+                    "activity": activity,
                     "elapsed_s": round(runtime.elapsed_s(now), 1),
                     "tokens": runtime.tokens,
                     "attempts": runtime.attempts,
@@ -7362,6 +7718,7 @@ class RingerRunner:
         identity: str,
         dashboard_enabled: bool = True,
         force_browser: bool = False,
+        prepared_contexts: dict[str, PreparedContextPacket] | None = None,
     ) -> None:
         self.manifest = manifest
         self.config = config
@@ -7370,6 +7727,11 @@ class RingerRunner:
         self.run_id = build_run_id(manifest.run_name)
         self.started_at = datetime.now(timezone.utc)
         self.lock = threading.RLock()
+        self.prepared_contexts = (
+            prepare_context_packets(manifest)
+            if prepared_contexts is None
+            else validate_prepared_contexts(manifest, prepared_contexts)
+        )
         self.runtimes = [self._task_runtime(task) for task in manifest.tasks]
         self.state_writer = StateWriter(
             self.run_id,
@@ -7455,7 +7817,7 @@ class RingerRunner:
             if not prepared:
                 await self._record_prepare_error(runtime, prepare_error or "taskdir preparation failed")
                 return
-            current_spec = runtime.task.spec
+            current_spec = runtime.base_prompt
             max_attempts = 2
             for attempt in range(1, max_attempts + 1):
                 retrying = attempt > 1
@@ -7471,6 +7833,13 @@ class RingerRunner:
                         runtime.tokens = (runtime.tokens or 0) + worker.tokens
                 verify = await self.verifier.verify(runtime.task, runtime.taskdir)
                 verdict = verdict_for(worker, verify)
+                failure_context = None
+                if attempt < max_attempts and verdict in {"FAIL", "TIMEOUT"}:
+                    # Capture retry input before the raw verifier excerpt is
+                    # appended to the local worker log below.
+                    failure_context = build_failure_context(
+                        runtime.log_path, verify.raw_output_excerpt
+                    )
                 with self.lock:
                     runtime.last_check_returncode = verify.check_returncode
                     runtime.last_check_timed_out = verify.check_timed_out
@@ -7486,9 +7855,9 @@ class RingerRunner:
                     await self._cleanup_worktree_on_pass(runtime)
                     return
                 if attempt < max_attempts and verdict in {"FAIL", "TIMEOUT"}:
-                    failure_context = build_failure_context(runtime.log_path, verify.raw_output_excerpt)
+                    assert failure_context is not None
                     current_spec = (
-                        f"{runtime.task.spec}\n\n"
+                        f"{runtime.base_prompt}\n\n"
                         f"Previous attempt failed: {failure_context}. Fix it."
                     )
                     continue
@@ -7812,6 +8181,13 @@ class RingerRunner:
         verdict: str,
         duration_ms: int,
     ) -> None:
+        if runtime.context_packet is not None and verify.raw_output_excerpt:
+            append_text(
+                runtime.log_path,
+                "\n[ringer.py] raw verifier output excerpt:\n"
+                f"{verify.raw_output_excerpt}\n",
+            )
+        public_check_output = public_check_diagnostic(runtime, verify.raw_output_excerpt)
         engine = self.config.engines.get(runtime.task.engine)
         resolved_model = resolved_task_model(
             runtime.task,
@@ -7843,7 +8219,7 @@ class RingerRunner:
         if verify.missing_files:
             notes_parts.append(f"missing_expect_files={json.dumps(list(verify.missing_files))}")
         notes_parts.append("raw_check_output_first_2000_chars:")
-        notes_parts.append(verify.raw_output_excerpt)
+        notes_parts.append(public_check_output)
         with contextlib.suppress(Exception):
             self._write_steering_observation(
                 runtime,
@@ -7859,7 +8235,14 @@ class RingerRunner:
                 "run_id": self.run_id,
                 "pattern": "ringer-py",
                 "task_key": runtime.task.key,
-                "spec": spec[:500],
+                # Preserve the legacy/public meaning of spec and never copy
+                # packet evidence into eval storage.
+                "spec": runtime.task.spec[:500],
+                "context_packet": (
+                    runtime.context_packet.metadata()
+                    if runtime.context_packet is not None
+                    else None
+                ),
                 "worker_engine": runtime.task.engine,
                 "shepherd_model": SHEPHERD_MODEL,
                 "verify_method": VERIFY_METHOD,
@@ -7920,7 +8303,9 @@ class RingerRunner:
                 "verdict": verdict,
                 "duration_ms": duration_ms,
                 "worker_tokens": worker.tokens,
-                "check_excerpt": verify.raw_output_excerpt[:500],
+                "check_excerpt": public_check_diagnostic(
+                    runtime, verify.raw_output_excerpt
+                )[:500],
             }
             path = (
                 steering_dir
@@ -7941,10 +8326,13 @@ class RingerRunner:
         log_path = self._log_path(task, taskdir)
         with contextlib.suppress(FileNotFoundError):
             log_path.unlink()
+        context_packet = self.prepared_contexts.get(task.key)
         return TaskRuntime(
             task=task,
             taskdir=taskdir,
             log_path=log_path,
+            base_prompt=compose_task_prompt(task.spec, context_packet),
+            context_packet=context_packet,
             spec_short=shorten(task.spec, 120),
         )
 
@@ -8362,6 +8750,16 @@ def worker_activity(path: Path, log_tail: list[str]) -> str:
     return activity_fallback(log_tail)
 
 
+def packet_runtime_activity(status: str, attempts: int) -> str:
+    """Return safe packet-task progress using runtime fields only."""
+    normalized_status = str(status).strip().lower()
+    if normalized_status == "queued":
+        return "waiting"
+    if normalized_status in {"running", "retrying", "verifying", "pass", "fail"}:
+        return f"{normalized_status} (attempt {max(0, int(attempts))})"
+    return "waiting"
+
+
 def last_shell_command_activity(text: str) -> str:
     for line in reversed(non_empty_log_lines(text)):
         command = extract_shell_command(line)
@@ -8538,7 +8936,13 @@ def dry_run(
     identity: str,
     dashboard_enabled: bool,
     force_browser: bool,
+    prepared_contexts: dict[str, PreparedContextPacket] | None = None,
 ) -> None:
+    prepared_contexts = (
+        prepare_context_packets(manifest)
+        if prepared_contexts is None
+        else validate_prepared_contexts(manifest, prepared_contexts)
+    )
     print("DRY RUN: no codex workers will be spawned.")
     print(f"Run: {manifest.run_name}")
     print(f"Identity: {identity}")
@@ -8564,13 +8968,15 @@ def dry_run(
     print("Tasks:")
     for task in manifest.tasks:
         taskdir = (manifest.workdir / task.key).resolve()
+        context_packet = prepared_contexts.get(task.key)
+        base_prompt = compose_task_prompt(task.spec, context_packet)
         engine = config.engines.get(task.engine)
         full_access_allowed = task.full_access and config.allow_full_access
         cmd = (
             build_worker_command(
                 engine,
                 taskdir=taskdir,
-                spec=task.spec,
+                spec=base_prompt,
                 full_access=task.full_access,
                 engine_args=task.engine_args,
                 model=task.model,
@@ -8588,6 +8994,8 @@ def dry_run(
             print("    full_access: false")
         print(f"    expect_files: {list(task.expect_files)}")
         print(f"    check: {task.check}")
+        if context_packet is not None:
+            print(f"    context_packet: {json.dumps(context_packet.metadata(), sort_keys=True)}")
         if engine is None:
             print("    command: ERROR unknown engine")
         elif task.full_access and not config.allow_full_access:
@@ -8843,6 +9251,7 @@ async def run_manifest(
     identity: str,
     dashboard_enabled: bool,
     force_browser: bool,
+    prepared_contexts: dict[str, PreparedContextPacket] | None = None,
 ) -> int:
     runner = RingerRunner(
         manifest,
@@ -8850,6 +9259,7 @@ async def run_manifest(
         identity=identity,
         dashboard_enabled=dashboard_enabled,
         force_browser=force_browser,
+        prepared_contexts=prepared_contexts,
     )
     register_active_run(
         runner.run_id,
@@ -9046,6 +9456,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "lint":
             manifest = Manifest.from_path(args.manifest)
             findings = lint_manifest(manifest)
+            prepare_context_packets(manifest)
             if findings:
                 print_lint_findings(findings)
                 return 1
@@ -9073,9 +9484,10 @@ def main(argv: list[str] | None = None) -> int:
         else:
             manifest_path = args.manifest
         manifest = Manifest.from_path(manifest_path).with_max_parallel(args.max_parallel)
+        print_lint_findings(lint_manifest(manifest, include_model_log_nudges=True))
+        prepared_contexts = prepare_context_packets(manifest)
         with contextlib.suppress(Exception):
             print_steering_notes(manifest, config)
-        print_lint_findings(lint_manifest(manifest, include_model_log_nudges=True))
         validate_manifest_engines(manifest, config)
         identity_start_paths = [manifest.workdir]
         if manifest.source_path is not None:
@@ -9091,6 +9503,7 @@ def main(argv: list[str] | None = None) -> int:
                 identity=identity,
                 dashboard_enabled=dashboard_enabled,
                 force_browser=args.browser,
+                prepared_contexts=prepared_contexts,
             )
             return 0
         preflight_engine_bins(manifest, config)
@@ -9105,6 +9518,7 @@ def main(argv: list[str] | None = None) -> int:
                 identity=identity,
                 dashboard_enabled=dashboard_enabled,
                 force_browser=args.browser,
+                prepared_contexts=prepared_contexts,
             )
         )
     except KeyboardInterrupt:
