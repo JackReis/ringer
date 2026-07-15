@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ringer.dev/schema/context-packet.v1.json",
+  "title": "Ringer Context Packet v1",
+  "description": "Provider-neutral, integrity-bound untrusted evidence packet.",
+  "$comment": "Runtime validation additionally enforces duplicate-key rejection, SHA-256 bindings, chronology, freshness, UTF-8 byte limits, and unique evidence IDs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "packet_id", "subject", "created_at", "expires_at", "evidence", "integrity"],
+  "properties": {
+    "schema_version": {"const": "context-packet.v1"},
+    "packet_id": {"$ref": "#/$defs/id"},
+    "subject": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "\\S"},
+    "created_at": {"$ref": "#/$defs/timestamp"},
+    "expires_at": {"$ref": "#/$defs/timestamp"},
+    "evidence": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"$ref": "#/$defs/evidence"}},
+    "integrity": {"$ref": "#/$defs/packetIntegrity"}
+  },
+  "$defs": {
+    "safeInteger": {"type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991},
+    "id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"},
+    "timestamp": {"type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "provenance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source", "observed_at", "retrieved_at"],
+      "properties": {
+        "source": {"type": "string", "minLength": 1, "maxLength": 2048, "pattern": "\\S"},
+        "observed_at": {"$ref": "#/$defs/timestamp"},
+        "retrieved_at": {"$ref": "#/$defs/timestamp"}
+      }
+    },
+    "freshness": {
+      "type": "object", "additionalProperties": false,
+      "required": ["max_age_seconds"],
+      "properties": {"max_age_seconds": {"type": "integer", "minimum": 0, "maximum": 31536000}}
+    },
+    "contentIntegrity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["algorithm", "content_sha256"],
+      "properties": {"algorithm": {"const": "sha256"}, "content_sha256": {"$ref": "#/$defs/sha256"}}
+    },
+    "packetIntegrity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["algorithm", "canonicalization", "packet_sha256"],
+      "properties": {
+        "algorithm": {"const": "sha256"},
+        "canonicalization": {"const": "ringer-canonical-json.v1"},
+        "packet_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["evidence_id", "media_type", "content", "provenance", "freshness", "integrity"],
+      "properties": {
+        "evidence_id": {"$ref": "#/$defs/id"},
+        "media_type": {"description": "Untrusted descriptive metadata; consumers must not infer syntactic validity or executability.", "enum": ["text/plain", "text/markdown", "application/json"]},
+        "content": {"description": "Opaque text even when media_type is application/json.", "type": "string", "maxLength": 262144},
+        "provenance": {"$ref": "#/$defs/provenance"},
+        "freshness": {"$ref": "#/$defs/freshness"},
+        "integrity": {"$ref": "#/$defs/contentIntegrity"}
+      }
+    }
+  }
+}
