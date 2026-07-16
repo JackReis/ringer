@@ -22,8 +22,10 @@ def sandbox_profile(cwd,temp_home):
  # roots and carve back only the isolated fixture and temporary home.
  denied_reads=['/Users','/Volumes','/Network','/opt','/private/tmp','/private/var/folders','/private/var/tmp','/Library/Keychains']
  reads=[cwd,temp_home];writes=[cwd,temp_home]
- lines=['(version 1)','(deny default)','(deny network*)','(allow process*)','(allow sysctl-read)','(allow file-read*)']
+ metadata_roots=sorted({str(parent) for root in reads for parent in Path(root).resolve().parents if str(parent)!='/'})
+ lines=['(version 1)','(deny default)','(deny network*)','(allow process*)','(allow sysctl-read)','(allow file-read*)','(allow file-read* file-write* (literal "/dev/null"))']
  lines += [f'(deny file-read* (subpath {_seatbelt_quote(x)}))' for x in denied_reads]
+ lines += [f"(allow file-read-metadata {' '.join(f'(literal {_seatbelt_quote(x)})' for x in metadata_roots)})"]
  lines += [f'(allow file-read* (subpath {_seatbelt_quote(x)}))' for x in reads]
  lines += [f"(allow file-write* {' '.join(f'(subpath {_seatbelt_quote(x)})' for x in writes)})",'']
  return '\n'.join(lines)
@@ -38,7 +40,7 @@ def sandboxed_shell(command,cwd,temp_home,sandbox_bin):
    fd,profile=tempfile.mkstemp(prefix='fleet-wave-seatbelt-',suffix='.sb',dir=home)
    with os.fdopen(fd,'w') as f:f.write(profile_text);f.flush();os.fsync(f.fileno())
   except OSError as e:raise ProtocolError(f'sandbox profile creation failed: {e}') from e
-  quoted=subprocess.list2cmdline([str(marker)]);wrapped=f"{command}\nstatus=$?\nprintf '%s\\n' \"$status\" > {quoted}\nexit \"$status\""
+  quoted=subprocess.list2cmdline([str(marker)]);wrapped=f"set +e\n(\n{command}\n)\nstatus=$?\nprintf '%s\\n' \"$status\" > {quoted}\nexit \"$status\""
   try:r=subprocess.run([str(sandbox),'-f',profile,'/bin/sh','-c',wrapped],cwd=cwd,env=verification_env(home),text=True,capture_output=True)
   except OSError as e:raise ProtocolError(f'sandbox backend unavailable: {e}') from e
   try:status=int(marker.read_text().strip())

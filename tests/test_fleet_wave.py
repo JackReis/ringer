@@ -203,7 +203,7 @@ print(json.dumps({'runs':[{'run_id':'r1'}]} if sys.argv[-1].endswith('/api/runs'
  def test_sandboxed_shell_has_exact_environment_and_three_command_classes(self):
   old=os.environ.get('FLEET_PARENT_SENTINEL');os.environ['FLEET_PARENT_SENTINEL']='parent-only-secret'
   try:
-   for label,command,expected in [('replay-check','test -z "$FLEET_PARENT_SENTINEL"',0),('negative-setup','rm -f proof.txt',0),('negative-check','false',1)]:
+   for label,command,expected in [('replay-check','test -z "$FLEET_PARENT_SENTINEL"',0),('negative-setup','rm -f proof.txt',0),('negative-check','false',1),('errexit-negative','set -eu; false',1)]:
     home=self.root/label;home.mkdir();fixture=home/'task';fixture.mkdir();(fixture/'proof.txt').write_text('proof')
     r=FW.sandboxed_shell(command,fixture,home,self.sandbox);self.assertEqual(expected,r.returncode)
     self.assertEqual({'PATH':'/usr/bin:/bin','HOME':str(home),'TMPDIR':str(home),'LANG':'C','LC_ALL':'C','TZ':'UTC'},FW.verification_env(home))
@@ -222,7 +222,9 @@ print(json.dumps({'runs':[{'run_id':'r1'}]} if sys.argv[-1].endswith('/api/runs'
    self.assertEqual('/usr/bin/python3',FW.replay_interpreter())
  def test_seatbelt_profile_is_deny_default_network_denied_and_write_scoped(self):
   cwd=self.root/'fixture';home=self.root/'home';cwd.mkdir();home.mkdir();profile=FW.sandbox_profile(cwd,home)
-  self.assertIn('(deny default)',profile);self.assertIn('(deny network*)',profile);self.assertIn('(allow process*)',profile);self.assertIn('(allow sysctl-read)',profile);self.assertIn('(allow file-read*)',profile)
+  self.assertIn('(deny default)',profile);self.assertIn('(deny network*)',profile);self.assertIn('(allow process*)',profile);self.assertIn('(allow sysctl-read)',profile);self.assertIn('(allow file-read*)',profile);self.assertIn('(allow file-read* file-write* (literal "/dev/null"))',profile)
+  metadata_line=next(x for x in profile.splitlines() if x.startswith('(allow file-read-metadata'))
+  self.assertIn('(literal "/private")',metadata_line);self.assertNotIn('(subpath "/private")',metadata_line)
   for root in ('/Users','/Volumes','/Network','/opt','/private/tmp','/private/var/folders','/Library/Keychains'):self.assertIn(f'(deny file-read* (subpath "{root}"))',profile)
   self.assertNotIn('(allow file-read-data',profile)
   write_line=next(x for x in profile.splitlines() if x.startswith('(allow file-write*'))
