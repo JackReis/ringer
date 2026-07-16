@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib, hmac, importlib.util, json, os, socket, subprocess, sys, tempfile, unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest import mock
 ROOT=Path(__file__).resolve().parents[1]; TOOL=ROOT/'tools/fleet_wave.py'
 SPEC=importlib.util.spec_from_file_location('fleet_wave_tool',TOOL);FW=importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(FW)
 def executable(path, body):
@@ -216,6 +217,9 @@ print(json.dumps({'runs':[{'run_id':'r1'}]} if sys.argv[-1].endswith('/api/runs'
   self.assertFalse(side.exists());failing=self.root/'failing-sandbox';failing.write_text('#!/bin/sh\nexit 97\n');failing.chmod(0o755)
   with self.assertRaises(FW.ProtocolError):FW.sandboxed_shell(f"touch {side}",fixture,home,failing)
   self.assertFalse(side.exists())
+ def test_macos_replay_uses_system_python_outside_denied_user_root(self):
+  with mock.patch.object(FW.sys,'platform','darwin'), mock.patch.object(FW.sys,'executable','/Users/hermes/homebrew/bin/python3'):
+   self.assertEqual('/usr/bin/python3',FW.replay_interpreter())
  def test_seatbelt_profile_is_deny_default_network_denied_and_write_scoped(self):
   cwd=self.root/'fixture';home=self.root/'home';cwd.mkdir();home.mkdir();profile=FW.sandbox_profile(cwd,home)
   self.assertIn('(deny default)',profile);self.assertIn('(deny network*)',profile);self.assertIn('(allow process*)',profile);self.assertIn('(allow file-read*)',profile)

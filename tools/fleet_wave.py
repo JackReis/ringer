@@ -9,6 +9,12 @@ class ProtocolError(RuntimeError): pass
 SANDBOX_POLICY_VERSION='fleet-wave-seatbelt.v1'
 def verification_env(temp_home):
  return {'PATH':'/usr/bin:/bin','HOME':str(temp_home),'TMPDIR':str(temp_home),'LANG':'C','LC_ALL':'C','TZ':'UTC'}
+def replay_interpreter():
+ if sys.platform=='darwin':
+  system_python=Path('/usr/bin/python3')
+  if not system_python.is_file() or not os.access(system_python,os.X_OK):raise ProtocolError('system Python required for macOS sandbox replay')
+  return str(system_python)
+ return sys.executable
 def _seatbelt_quote(path):return '"'+str(Path(path).resolve()).replace('\\','\\\\').replace('"','\\"')+'"'
 def sandbox_profile(cwd,temp_home):
  # macOS 26 aborts sandbox-exec when deny-default profiles use filtered
@@ -342,7 +348,7 @@ def accept(a):
   if expected_inv!=snap['inventory'] or json_digest(expected_inv)!=snap['tree_digest']:raise ProtocolError('execute-bound replay input mismatch')
   with tempfile.TemporaryDirectory(prefix='fleet-wave-checker-receipt-') as out:
    inv=Path(out)/'inventory.json';inv.write_text(json.dumps(snap['inventory']));result=Path(out)/'result.json'
-   run([sys.executable,str(Path(__file__).resolve()),'replay-one','--snapshot',snap['path'],'--inventory',str(inv),'--tree-digest',snap['tree_digest'],'--check',command,'--output',str(result),'--sandbox-bin',a.sandbox_bin])
+   run([replay_interpreter(),str(Path(__file__).resolve()),'replay-one','--snapshot',snap['path'],'--inventory',str(inv),'--tree-digest',snap['tree_digest'],'--check',command,'--output',str(result),'--sandbox-bin',a.sandbox_bin])
    rr=load(result)
   raw_digest=json_digest({'stdout_sha256':rr['stdout_sha256'],'stderr_sha256':rr['stderr_sha256']})
   replay[k]={'checker':rr['checker'],'tree_digest':rr['tree_digest']};check_execution[k]={'command':['/bin/sh','-c',command],'exit_status':rr['exit_status'],'tool_check_versions':[{'tool':'/bin/sh','sha256':digest('/bin/sh')},{'tool':'fleet_wave.py','sha256':digest(__file__)}],'environment_digest':rr['sandbox']['environment_digest'],'sandbox':rr['sandbox'],'machine_readable_result':{'verdict':'PASS','stdout_sha256':rr['stdout_sha256'],'stderr_sha256':rr['stderr_sha256']},'raw_output_digest':raw_digest};clean_replay[k]={'isolated_copy':True,'checker':rr['checker'],'tree_digest':rr['tree_digest'],'exit_status':rr['exit_status'],'negative_controls':[]}
