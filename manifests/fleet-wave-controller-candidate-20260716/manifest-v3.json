@@ -1,0 +1,67 @@
+{
+  "schema_version": "fleet-wave.v1",
+  "manifest_version": 3,
+  "wave_id": "fleet-wave-controller-candidate-20260716",
+  "attempt_id": "fleet-wave-controller-candidate-20260716-v3-32d1de30-317c-434a-a70a-6b744c5449b3",
+  "supersedes": {
+    "path": "manifest-v2.json",
+    "sha256": "c7f2d2ccc1c15f44e7657ae6f3243072c3be1f47f1a2ef998ac77488db76ce71"
+  },
+  "run_name": "fleet-wave-controller-candidate-20260716-v3",
+  "workdir": "/private/tmp/ringer-fleet-wave-controller-candidate-20260716-v3",
+  "max_parallel": 1,
+  "ringer_manifest": "ringer-manifest-v3.json",
+  "ringer_state_dir": "/Users/hermes/.ringer",
+  "beads": {
+    "host": "Aegis.local",
+    "store": "/Users/hermes/.beads",
+    "claimant": "hermes",
+    "issue_id": "hermes-9zgz.1",
+    "existing_ids": [
+      "hermes-9zgz"
+    ]
+  },
+  "paperclip": {
+    "issue_id": "JAC-3584",
+    "existing_ids": [
+      "JAC-3415"
+    ]
+  },
+  "ringside": {
+    "base_url": "http://127.0.0.1:8700"
+  },
+  "bifrost": {
+    "correlation": null
+  },
+  "tasks": [
+    {
+      "key": "controller_candidate",
+      "work_type": "code",
+      "spec": "Create a candidate-only Fleet Wave controller integration without mutating the dirty canonical checkout. Work only inside this task directory except for read-only Git access to /Users/hermes/ringer. First record the canonical checkout's symbolic branch, HEAD, and SHA-256 of `git status --porcelain=v1 -uall`; these must equal fleet-sync/paperclip-to-ringer-20260709, 8c837910840fd6f4dac8c3792a48fd4624a14d8c, and 8750b0ff530ac509e1da96263073cb0b15f160a17754b0b1e95629ce13a02c08 respectively. Clone /Users/hermes/ringer into ./repo. Create branch candidate/fleet-wave-controller-20260716-v3 from the exact recorded canonical HEAD. From reviewed source commit c53fee7b27e55135a21793076c46569dcf18b671, copy exactly these six paths byte-for-byte into the candidate: docs/fleet-wave-protocol.md, schema/fleet-wave-receipt.v1.json, schema/fleet-wave.v1.json, templates/fleet-wave/manifest-v1.json, tests/test_fleet_wave.py, tools/fleet_wave.py. Do not change any other path. Commit exactly once over the base using a local repository-only Git identity. Run `PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m unittest -v tests.test_fleet_wave` and `git diff --check BASE..CANDIDATE`; both must pass. Create candidate.bundle with both HEAD and refs/heads/candidate/fleet-wave-controller-20260716-v3 pointing to the candidate commit so a fresh clone checks out deterministically; create integration.patch as the exact `git diff --binary BASE..CANDIDATE`, and changed-files.txt as the sorted exact six-path list. Copy /Users/hermes/.hermes/worktrees/ringer-fleet-wave-candidate-20260716-v1/checks/fleet_wave_candidate_bundle_v3.py to candidate_check.py without editing it. Write candidate.json with schema_version fleet-wave-candidate.v1; source_controller_sha; base_branch/base_sha; candidate_branch/candidate_sha; booleans canonical_checkout_mutated=false, merged=false, deployed=false; the exact source_files SHA-256 map encoded by candidate_check.py; successful test command/exit_code records; patch_sha256; and canonical_checkout containing path, branch_before/after, head_before/after, status_sha256_before/after. Re-read the canonical checkout at the end and fail if branch, HEAD, or status digest changed. Write integration-report.md containing the exact source/base/candidate SHAs and the phrases `candidate only`, `not merged`, and `not deployed`, plus verification and rollback instructions. Run candidate_check.py with /usr/bin/python3 from this task directory after removing ./repo; it must pass without any task-local Git repository or live `/Users` read dependency. Remove ./repo and any task-local .git directory before exiting so only the bounded evidence artifacts remain. Never push, merge, deploy, restart, change services, modify Beads/Paperclip, print credentials, or write outside this task directory.",
+      "check": "set -eu; expected='10fa56b19f841d4d7018fbf86effdfeca7f5d12c01a3155d6c5a6ee0923df78e'; actual=$(/usr/bin/shasum -a 256 candidate_check.py | /usr/bin/cut -d ' ' -f 1); if [ \"$actual\" != \"$expected\" ]; then echo \"FAIL candidate_check.py hash $actual does not match versioned oracle $expected\" >&2; exit 1; fi; /usr/bin/python3 candidate_check.py --candidate candidate.json --bundle candidate.bundle --patch integration.patch --report integration-report.md --changed changed-files.txt",
+      "negative_controls": [
+        {
+          "name": "candidate SHA tamper",
+          "setup": "python3 -c 'import json; p=\"candidate.json\"; d=json.load(open(p)); d[\"candidate_sha\"]=\"0\"*40; open(p,\"w\").write(json.dumps(d,indent=2,sort_keys=True)+\"\\n\")'"
+        },
+        {
+          "name": "bundle corruption",
+          "setup": "printf 'corrupt bundle\\n' > candidate.bundle"
+        }
+      ],
+      "expect_files": [
+        "candidate.json",
+        "candidate.bundle",
+        "integration.patch",
+        "integration-report.md",
+        "changed-files.txt",
+        "candidate_check.py"
+      ],
+      "verified": "The executed oracle proves a one-commit, exact-six-file Fleet Wave candidate based on the bound Aegis HEAD, with byte-identical reviewed controller files, valid Git bundle/patch evidence, an unchanged canonical checkout, and a fresh 37/37 controller test replay.",
+      "evidence": {
+        "strength": "strong",
+        "kind": "objective"
+      }
+    }
+  ]
+}
