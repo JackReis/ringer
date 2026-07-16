@@ -222,7 +222,7 @@ print(json.dumps({'runs':[{'run_id':'r1'}]} if sys.argv[-1].endswith('/api/runs'
    self.assertEqual('/usr/bin/python3',FW.replay_interpreter())
  def test_seatbelt_profile_is_deny_default_network_denied_and_write_scoped(self):
   cwd=self.root/'fixture';home=self.root/'home';cwd.mkdir();home.mkdir();profile=FW.sandbox_profile(cwd,home)
-  self.assertIn('(deny default)',profile);self.assertIn('(deny network*)',profile);self.assertIn('(allow process*)',profile);self.assertIn('(allow file-read*)',profile)
+  self.assertIn('(deny default)',profile);self.assertIn('(deny network*)',profile);self.assertIn('(allow process*)',profile);self.assertIn('(allow sysctl-read)',profile);self.assertIn('(allow file-read*)',profile)
   for root in ('/Users','/Volumes','/Network','/opt','/private/tmp','/private/var/folders','/Library/Keychains'):self.assertIn(f'(deny file-read* (subpath "{root}"))',profile)
   self.assertNotIn('(allow file-read-data',profile)
   write_line=next(x for x in profile.splitlines() if x.startswith('(allow file-write*'))

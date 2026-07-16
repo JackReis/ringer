@@ -22,7 +22,7 @@ def sandbox_profile(cwd,temp_home):
  # roots and carve back only the isolated fixture and temporary home.
  denied_reads=['/Users','/Volumes','/Network','/opt','/private/tmp','/private/var/folders','/private/var/tmp','/Library/Keychains']
  reads=[cwd,temp_home];writes=[cwd,temp_home]
- lines=['(version 1)','(deny default)','(deny network*)','(allow process*)','(allow file-read*)']
+ lines=['(version 1)','(deny default)','(deny network*)','(allow process*)','(allow sysctl-read)','(allow file-read*)']
  lines += [f'(deny file-read* (subpath {_seatbelt_quote(x)}))' for x in denied_reads]
  lines += [f'(allow file-read* (subpath {_seatbelt_quote(x)}))' for x in reads]
  lines += [f"(allow file-write* {' '.join(f'(subpath {_seatbelt_quote(x)})' for x in writes)})",'']
