@@ -141,6 +141,25 @@ token_regex = "tokens\\s+used\\s*:?\\s*([0-9][0-9,]*)"
 # full_access_args = ["--no-sandbox"]
 # token_regex = '"tokens":\{"total":([0-9]+)'
 
+# Antigravity subscription lane via the interactive iTerm2 API. This wrapper
+# is macOS-only and requires iTerm2's Python API plus an authenticated `agy`
+# installation. It captures a file deliverable and terminal transcript, then
+# closes the temporary iTerm2 window.
+# [engines.agy_iterm2]
+# bin = "/absolute/path/to/ringer/engines/agy-iterm2-judge.sh"
+# model_default = "Gemini 3.1 Pro (High)"
+# args_template = [
+#   "--taskdir",
+#   "{taskdir}",
+#   "--model",
+#   "{model}",
+#   "{engine_args}",
+#   "--",
+#   "{spec}",
+# ]
+# sandbox_args = []
+# full_access_args = []
+
 [artifact]
 # Zero-LLM, self-contained HTML artifacts rendered directly from state — no model calls, no
 # network. Three files per config, all pure stdlib templates:

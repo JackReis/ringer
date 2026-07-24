@@ -1,4 +1,5 @@
 __pycache__/
+engines/agy-iterm2-venv/
 *.pyc
 build.log
 hud-build.log
