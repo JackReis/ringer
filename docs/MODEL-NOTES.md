@@ -269,3 +269,48 @@ checks and raw logs support — no vibes, no worker self-reports.
 ## codex (2026-07-06, bench-operator-proofing)
 - 8/8 code-feature tasks passed attempt 1 across 3 rounds (worktrees mode, Python harness refactor; 108k-406k tokens/task). Specs embedded the approved architecture doc + exact file ownership; checks built fresh uv venvs and ran the full pytest suite.
 - Lesson (check design, not model): all 3 post-integration bugs were invisible to the checks — a test that passed only because the worker's worktree lacked .env, a `--help`-only assertion missing a runtime importlib/sys.modules bug (py3.12 dataclasses), and bare console-script names failing outside activated venvs. Checks should exercise one real invocation from a cold shell, not just --help.
+
+## GLM-5.2
+- 2026-07-09: `openrouter/z-ai/glm-5.2` = misconfigured provider (was meant to be HuggingFace). 6 probe failures (0/3 first-try) on 2026-07-09 were provider-routing artifacts, not model quality — purged from runs.jsonl (backup `~/.ringer/runs.jsonl.bak.glm-openrouter.*`). Do NOT audition GLM via OpenRouter; wire it via HuggingFace if wanted.
+
+## Routing judgment — 2026-07-24 (model economy shift)
+
+This is a JUDGMENT overlay on the scoreboard, not a numbers update. The
+`./ringer.py models` scoreboard is DERIVED from historical `~/.ringer/runs.jsonl`
+eval rows — you cannot "demote" a model without new runs, so dead models keep
+ranking high from past passes. Read this before trusting a high historical
+pass rate.
+
+- **gpt-5.5 / gpt-5.6-sol — DEAD, DO NOT ROUTE.** OpenAI quota has been OUT
+  since 2026-07-19 (ChatGPT/Codex subscription wall; the live review session
+  stalled). These still rank ~1.0 on the scoreboard from past first-try passes,
+  but every new call fails at the provider. Do NOT pick them off the scoreboard.
+  `hermes auth status` lies here — it reports "logged in" for creds-present even
+  when the account is quota-exhausted/401; that is NOT a liveness signal. The
+  openai-first fallback tree is INERT until quota resets — expect fall-through
+  to the next live hop. Evidence: memory `fleet-model-economy-shift-2026-07-19`.
+
+- **deepseek-v4-pro (ollama-cloud) — PROVEN content-returning cloud model, but
+  CONCURRENCY-limited.** This is the best cloud model that actually returns real
+  `message.content` through the OpenAI-compat endpoint (Ringer bakeoff
+  `ollama-cloud-model-proving`, fresh 2026-07-20 first-try receipts; bead
+  hermes-3bfm CLOSED). CAVEAT: the Ollama Cloud Max plan caps at **10 concurrent
+  cloud models** — the root cause of the 429 saturation on 07-19/07-20 when the
+  fleet mass-consolidated onto one model/plan (bead hermes-l9xg). Do not fan more
+  than ~8 concurrent cloud workers onto it; a cloud admission semaphore
+  (bead hermes-04ps.1.3, cloud extension) is the structural fix.
+
+- **kimi-k2.7-code / qwen3.5:397b (ollama-cloud) — DO NOT ROUTE to Paperclip/
+  Hermes.** They PASS the Ringer code check but return EMPTY `message.content`
+  with the answer in a nonstandard `reasoning` field — the quiet-output bug
+  (bead hermes-04ps.1.1). A Hermes-side parser fix now promotes that reasoning
+  to visible content (agent/conversation_loop.py), but until that is deployed
+  fleet-wide, treat these as reasoning-only and route content-critical work to
+  deepseek-v4-pro instead. minimax-m3 also returns real content; glm-5.2 is the
+  weakest (Ringer ~0.33) and reasoning-heavy.
+
+- **qwen3-coder:30b (local ollama :11435) — the LOCAL pressure-relief engine.**
+  Historical ~0.79 pass / ~0.40 first-try. Not the strongest, but it runs
+  on-box with no cloud quota/concurrency exposure, so it is the right lane to
+  bleed load off the 10-concurrent cloud cap when cloud is saturated. Local-first
+  is fleet policy for autonomous lanes (memory `paperclip-autonomous-routing-policy`).
