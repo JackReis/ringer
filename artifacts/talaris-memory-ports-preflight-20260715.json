@@ -1,0 +1,15 @@
+{
+  "schema_version": "ringer.talaris-memory-preflight.v1",
+  "checked_at": "2026-07-15T02:06:38.991746+00:00",
+  "source_host": "Aegis",
+  "target_host": "Talaris",
+  "collection_command": "ssh talaris: hostname; lsof TCP 8888/9177 listeners; ps PID 4659 command; curl health 8888/9177",
+  "collection_exit_code": 0,
+  "raw_nonsecret_evidence": "HOSTNAME\nTalaris\nLSOF_8888\nCOMMAND    PID      USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME\npython3.1 4659 jack.reis   12u  IPv4 0x3c43dc2be63e4f4a      0t0  TCP 127.0.0.1:8888 (LISTEN)\nLSOF_9177\nPID_4659\n 4659 jack.reis /Users/jack.reis/.hermes/hermes-agent/.venv/bin/python /Users/jack.reis/.hermes/hermes-agent/.venv/bin/hindsight-api --daemon --idle-timeout 0 --port 9177\nHEALTH_8888\n{\"status\":\"healthy\",\"database\":\"connected\"}\nHEALTH_9177\nPROBE_FAILED\ncurl: (7) Failed to connect to 127.0.0.1 port 9177 after 0 ms: Couldn't connect to server",
+  "interpretation_contract": {
+    "configured_or_requested_port": "Take from process command-line --port argument.",
+    "observed_bind_port": "Take only from lsof LISTEN evidence.",
+    "healthy_port": "Take only from successful curl JSON evidence.",
+    "mismatch_verified": "True only when configured/requested port differs from both observed bind and healthy port."
+  }
+}

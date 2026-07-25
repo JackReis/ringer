@@ -1,0 +1,26 @@
+P2 Functional Verify — GroktoCrawl Aegis
+=========================================
+
+=== (a) SCRAPE https://example.com — PASS ===
+{"success":true,"data":{"markdown":"# Example Domain\n\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\n\n[Learn more](https://iana.org/domains/example)","metadata":{"json_ld":[],"og":{},"twitter":{},"meta":{}},"download":null,"quality":null,"images":null},"error":null}
+=== (b) SEARCH 'test' limit 3 — PASS ===
+[
+  {
+    "url": "https://www.speedtest.net/",
+    "title": "Speedtest by Ookla - The Global Broadband Speed Test"
+  },
+  {
+    "url": "https://fast.com/",
+    "title": "Internet Speed Test | Fast.com"
+  },
+  {
+    "url": "https://en.wikipedia.org/wiki/Test",
+    "title": "Test - Wikipedia"
+  }
+]
+
+=== (c) ANSWER Burj Khalifa — FAIL (LLM lane wedged) ===
+POST /v2/answer -> 'LLM API returned 503'
+Ollama /api/generate direct probe -> curl exit 28 (timeout >180s)
+Ollama /v1/chat/completions -> 'server busy, maximum pending requests exceeded'
+Cloud fallback: OPENAI_API_KEY invalid_api_key; OPENROUTER_API_KEY 401

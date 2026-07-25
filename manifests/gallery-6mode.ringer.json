@@ -1,0 +1,40 @@
+{
+  "run_name": "gallery-6mode-orchestration",
+  "_tag": "zatara/gallery-6mode/2026-07-09",
+  "_source": "Zatara (Talaris) — verification probe of the shipped 6-mode lighting + orchestration-surfaces gallery",
+  "_doctrine": "ADR-0018: everything visible in Ringer, in addition. Executed checks curl the LIVE here.now pages and gate on real served content — no trusting 'done'.",
+  "workdir": "/tmp/ringer-gallery-6mode",
+  "max_parallel": 3,
+  "tasks": [
+    {
+      "key": "gallery_index_live",
+      "task_type": "probe",
+      "engine": "codex",
+      "timeout_s": 600,
+      "expect_files": ["receipt.md"],
+      "spec": "Verification-only probe. Do NOT modify anything outside your task dir. Run: curl -fsS https://happy-aurora-tqr7.here.now/ and confirm the response is HTTP 200 and contains the text 'Agentic OS'. Write ./receipt.md recording the exact command, the HTTP status, and whether the marker was found. Done = receipt.md with a verification line.",
+      "check": "curl -fsS https://happy-aurora-tqr7.here.now/ -o idx.html && grep -q 'Agentic OS' idx.html && echo 'GALLERY_INDEX_LIVE_OK'",
+      "verified": "here.now gallery index returns 200 and contains 'Agentic OS'"
+    },
+    {
+      "key": "six_mode_lighting",
+      "task_type": "probe",
+      "engine": "codex",
+      "timeout_s": 600,
+      "expect_files": ["receipt.md"],
+      "spec": "Verification-only probe. Do NOT modify anything outside your task dir. Fetch the published stylesheet https://happy-aurora-tqr7.here.now/shared/tokens.css and confirm ALL SIX lighting modes are served: data-theme selectors for dusk, twilight, hydroponics, forest, blueprint (plus the default Parchment). Write ./receipt.md with the command, which selectors were found, and a verification line. Done = receipt.md with a verification line.",
+      "check": "curl -fsS https://happy-aurora-tqr7.here.now/shared/tokens.css -o t.css && grep -q 'data-theme=\"dusk\"' t.css && grep -q 'data-theme=\"twilight\"' t.css && grep -q 'data-theme=\"hydroponics\"' t.css && grep -q 'data-theme=\"forest\"' t.css && grep -q 'data-theme=\"blueprint\"' t.css && echo 'SIX_MODE_LIGHTING_OK'",
+      "verified": "published tokens.css serves all 6 data-theme lighting modes"
+    },
+    {
+      "key": "orchestration_surfaces",
+      "task_type": "probe",
+      "engine": "codex",
+      "timeout_s": 600,
+      "expect_files": ["receipt.md"],
+      "spec": "Verification-only probe. Do NOT modify anything outside your task dir. Fetch https://happy-aurora-tqr7.here.now/founder-cockpit/ and confirm the Orchestration Surfaces section is served (text 'Orchestration Surfaces' and a reference to 'Ringer' or 'Ringside'). Write ./receipt.md with the command, matches found, and a verification line. Done = receipt.md with a verification line.",
+      "check": "curl -fsS https://happy-aurora-tqr7.here.now/founder-cockpit/ -o fc.html && grep -q 'Orchestration Surfaces' fc.html && grep -qE 'Ringer|Ringside' fc.html && echo 'ORCHESTRATION_SURFACES_OK'",
+      "verified": "founder-cockpit serves the Orchestration Surfaces section referencing Ringer/Ringside"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "run_name": "github-account-consolidation-inventory",
+  "workdir": "/Users/hermes/.ringer/work/github-account-consolidation-inventory",
+  "risk": "low",
+  "orchestrator": {
+    "provider": "local",
+    "model": "mock",
+    "family": "deterministic",
+    "runtime": "hermes-ringer",
+    "attestation": "Zero-token verification of read-only GitHub inventory, dual-host clone evidence, and consolidation planning artifacts"
+  },
+  "max_parallel": 2,
+  "worktrees": false,
+  "tasks": [
+    {
+      "key": "verify-github-owner-inventory",
+      "engine": "mock",
+      "task_type": "inventory-verification",
+      "paperclip_issue": "JAC-3791",
+      "bead_id": "hermes-42g1",
+      "spec": "MOCK_FILE: inventory-contract.json\n{\"personal_owner\":\"JackReis\",\"organization\":\"jar-reis\",\"personal_count\":135,\"organization_count\":20,\"repository_mutations\":false,\"remote_mutations\":false,\"model_tokens\":0}\nMOCK_END",
+      "check": "python3 -c 'import json; from pathlib import Path; root=Path(\"/Users/hermes/Vault/coordination/open-fleet-coordination/artifacts/github-account-consolidation-20260723\"); c=json.loads(Path(\"inventory-contract.json\").read_text()); p=json.loads((root/\"personal-repos.json\").read_text()); o=json.loads((root/\"org-repos.json\").read_text()); assert c[\"personal_owner\"]==\"JackReis\"; assert c[\"organization\"]==\"jar-reis\"; assert len(p)==c[\"personal_count\"]==135; assert len(o)==c[\"organization_count\"]==20; assert c[\"repository_mutations\"] is False; assert c[\"remote_mutations\"] is False; print(\"PASS: GitHub owner inventories verified read-only\")'",
+      "expect_files": [
+        "inventory-contract.json"
+      ],
+      "timeout_s": 60,
+      "verified": "Aegis authenticated inventory contains 135 personal repositories and 20 organization repositories without repository or remote mutation."
+    },
+    {
+      "key": "verify-dual-host-plan-and-receipts",
+      "engine": "mock",
+      "task_type": "coordination-verification",
+      "paperclip_issue": "JAC-3791",
+      "bead_id": "hermes-42g1",
+      "spec": "MOCK_FILE: coordination-contract.json\n{\"authority\":\"aegis\",\"observer\":\"talaris-read-only\",\"beads_issue\":\"hermes-42g1\",\"paperclip_issue\":\"JAC-3791\",\"approval_required_before_transfer\":true,\"model_tokens\":0}\nMOCK_END",
+      "check": "python3 -c 'import json; from pathlib import Path; root=Path(\"/Users/hermes/Vault/coordination/open-fleet-coordination/artifacts/github-account-consolidation-20260723\"); c=json.loads(Path(\"coordination-contract.json\").read_text()); report=(root/\"github-account-consolidation-plan.md\").read_text(); ar=(root/\"aegis-remotes.tsv\").read_text().splitlines(); tr=(root/\"talaris-remotes.tsv\").read_text().splitlines(); assert c[\"authority\"]==\"aegis\"; assert c[\"observer\"]==\"talaris-read-only\"; assert c[\"beads_issue\"] in report; assert c[\"paperclip_issue\"] in report; assert c[\"approval_required_before_transfer\"] is True; assert len(ar)==70; assert len(tr)==247; assert \"no repositories, permissions, teams, or remotes changed\" in report; assert \"Transfer Verification Checklist\" in report; print(\"PASS: dual-host evidence, approvals, and coordination receipts verified\")'",
+      "expect_files": [
+        "coordination-contract.json"
+      ],
+      "timeout_s": 60,
+      "verified": "Aegis authority, Talaris read-only evidence, Beads/Paperclip links, and approval-gated transfer checklist are present."
+    }
+  ]
+}

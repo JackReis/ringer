@@ -1,0 +1,170 @@
+{
+  "checked_at": "2026-07-14T21:53:33Z",
+  "repo": "/Users/hermes/ringer",
+  "pids": {
+    "49609": {
+      "exists": false,
+      "evidence": [
+        "python os.kill(49609, 0) raised ProcessLookupError errno=3 strerror='No such process'",
+        "shell kill -0 49609 returned exit=1",
+        "macOS ps/pgrep inspection was blocked by the sandbox: operation not permitted / sysmond service not found",
+        "rg found 49609 only in the stale-run reconciliation receipt and this diagnostic task text, not in a persisted ~/.ringer/runs/*.json state file"
+      ]
+    },
+    "78643": {
+      "exists": false,
+      "evidence": [
+        "python os.kill(78643, 0) raised ProcessLookupError errno=3 strerror='No such process'",
+        "shell kill -0 78643 returned exit=1",
+        "/Users/hermes/.ringer/runs/hermes-ggio-quota-monitor-20260714T201231Z-p78643.json records pid=78643 and state=died after reconciliation",
+        "/Users/hermes/.ringer/forensics/stale-run-reconcile-20260714T214811Z/hermes-ggio-quota-monitor-20260714T201231Z-p78643.json.before records the same run as state=live, finished=false",
+        "/Users/hermes/.ringer/forensics/stale-run-reconcile-20260714T214811Z/receipt.json lists dead_pids [49609, 78643] and states the mutation was live -> died"
+      ]
+    }
+  },
+  "ringside_active": {
+    "api_checked": true,
+    "safe_endpoint": "GET http://127.0.0.1:8700/api/runs",
+    "unsafe_endpoint_not_called": "GET /api/library was not called because ringer.py reconciles artifact library state on that read path",
+    "observations": [
+      "One /api/runs probe succeeded and returned active run fleet-recovery-readonly-20260714-v1-20260714T214953Z-p31157 with pid=31157.",
+      "Later probes to 127.0.0.1:8700/api/runs and 127.0.0.1:8701/api/runs failed to connect, so the API was transient during this read-only check.",
+      "/Users/hermes/.ringer/active-runs.json currently contains only fleet-recovery-readonly-20260714-v1-20260714T214953Z-p31157."
+    ],
+    "active_runs_file": {
+      "path": "/Users/hermes/.ringer/active-runs.json",
+      "entries": [
+        {
+          "run_id": "fleet-recovery-readonly-20260714-v1-20260714T214953Z-p31157",
+          "pid": 31157,
+          "identity": "aegis",
+          "run_name": "fleet-recovery-readonly-20260714-v1",
+          "started_at": "2026-07-14T21:49:53.640682+00:00",
+          "workdir": "/Users/hermes/ringer/jobs/fleet-recovery-readonly-20260714-v1"
+        }
+      ]
+    }
+  },
+  "stale_records": [
+    {
+      "run_id": "aegis-audit-batch-20260711-20260711T162301Z-p85798",
+      "path": "/Users/hermes/.ringer/runs/aegis-audit-batch-20260711-20260711T162301Z-p85798.json",
+      "pid": 85798,
+      "recorded_state": "live",
+      "finished": false,
+      "pid_probe": "ProcessLookupError"
+    },
+    {
+      "run_id": "aegis-paperclip-ringer-safe-handoff-pilot-20260711-20260711T174930Z-p8728",
+      "path": "/Users/hermes/.ringer/runs/aegis-paperclip-ringer-safe-handoff-pilot-20260711-20260711T174930Z-p8728.json",
+      "pid": 8728,
+      "recorded_state": "live",
+      "finished": false,
+      "pid_probe": "ProcessLookupError"
+    },
+    {
+      "run_id": "aegis-paperclip-ringer-safe-handoff-repair-20260711-20260711T181152Z-p23079",
+      "path": "/Users/hermes/.ringer/runs/aegis-paperclip-ringer-safe-handoff-repair-20260711-20260711T181152Z-p23079.json",
+      "pid": 23079,
+      "recorded_state": "live",
+      "finished": false,
+      "pid_probe": "ProcessLookupError"
+    },
+    {
+      "run_id": "family-bulletin-sandy-deploy-ffce4de-20260713T232616Z-p82815",
+      "path": "/Users/hermes/.ringer/runs/family-bulletin-sandy-deploy-ffce4de-20260713T232616Z-p82815.json",
+      "pid": 82815,
+      "recorded_state": "live",
+      "finished": false,
+      "pid_probe": "ProcessLookupError"
+    },
+    {
+      "run_id": "family-bulletin-sandy-deploy-ffce4de-v2-20260713T232644Z-p83108",
+      "path": "/Users/hermes/.ringer/runs/family-bulletin-sandy-deploy-ffce4de-v2-20260713T232644Z-p83108.json",
+      "pid": 83108,
+      "recorded_state": "live",
+      "finished": false,
+      "pid_probe": "ProcessLookupError"
+    },
+    {
+      "run_id": "cron-pin-brain-health-monitor-20260713-20260714T001759Z-p98763",
+      "path": "/Users/hermes/.ringer/runs/cron-pin-brain-health-monitor-20260713-20260714T001759Z-p98763.json",
+      "pid": 98763,
+      "recorded_state": "live",
+      "finished": false,
+      "pid_probe": "ProcessLookupError"
+    },
+    {
+      "run_id": "fleet-instruction-refresh-20260714-20260714T184851Z-p90068",
+      "path": "/Users/hermes/.ringer/runs/fleet-instruction-refresh-20260714-20260714T184851Z-p90068.json",
+      "pid": 90068,
+      "recorded_state": "live",
+      "finished": false,
+      "pid_probe": "ProcessLookupError"
+    },
+    {
+      "run_id": "watchdog-provider-warning-independent-audit-20260714T193450Z-p39447",
+      "path": "/Users/hermes/.ringer/runs/watchdog-provider-warning-independent-audit-20260714T193450Z-p39447.json",
+      "pid": 39447,
+      "recorded_state": "live",
+      "finished": false,
+      "pid_probe": "ProcessLookupError"
+    },
+    {
+      "run_id": "jac3415-final-verification-20260714T194953Z-p54161",
+      "path": "/Users/hermes/.ringer/runs/jac3415-final-verification-20260714T194953Z-p54161.json",
+      "pid": 54161,
+      "recorded_state": "live",
+      "finished": false,
+      "pid_probe": "ProcessLookupError"
+    },
+    {
+      "run_id": "hermes-ggio-quota-monitor-20260714T201231Z-p78643",
+      "path": "/Users/hermes/.ringer/runs/hermes-ggio-quota-monitor-20260714T201231Z-p78643.json",
+      "pid": 78643,
+      "recorded_state": "died",
+      "finished": false,
+      "pid_probe": "ProcessLookupError",
+      "forensic_before_state": "live",
+      "forensic_receipt": "/Users/hermes/.ringer/forensics/stale-run-reconcile-20260714T214811Z/receipt.json",
+      "reconciliation_reason": "orchestrator PID 78643 absent; active-runs registry empty; preserved incomplete run as died"
+    }
+  ],
+  "root_cause": "Dead processes can remain marked live because the durable run state files under ~/.ringer/runs are independent forensic records. active-runs.json is pruned against pid liveness, but that pruning does not update old run JSON. Ringside /api/runs scans ~/.ringer/runs/*.json with scan_hud_run_states() and returns each JSON object largely verbatim, so any abruptly terminated orchestrator that left state='live' and finished=false can still appear live unless a separate reconciliation step rewrites or projects it as died.",
+  "causal_evidence": [
+    "/Users/hermes/ringer/ringer.py:2006-2017 pid_is_alive() uses os.kill(pid, 0) and treats ProcessLookupError as dead.",
+    "/Users/hermes/ringer/ringer.py:2036-2055 _prune_active_runs() drops dead PIDs only from the active-runs registry.",
+    "/Users/hermes/ringer/ringer.py:2066-2072 read_active_runs() writes the pruned active registry back, but it does not touch ~/.ringer/runs/<run_id>.json.",
+    "/Users/hermes/ringer/ringer.py:4239-4258 scan_hud_run_states() reads recent run JSON files and appends the parsed data without liveness normalization.",
+    "/Users/hermes/ringer/ringer.py:4386-4393 /api/runs returns scan_hud_run_states(state_dir) plus read_active_runs_file(), so stale state in run JSON can reach Ringside.",
+    "/Users/hermes/ringer/ringer.py:2276-2293 reconcile_artifact_library_dead_runs() marks artifact-library entries died when their current_run_id is not active, but it does not reconcile run JSON.",
+    "/Users/hermes/ringer/ringer.py:4436-4444 /api/library invokes reconcile_artifact_library_dead_runs() on read; /api/runs does not.",
+    "/Users/hermes/.ringer/forensics/stale-run-reconcile-20260714T214811Z/mutation.diff shows hermes-ggio-quota-monitor-20260714T201231Z-p78643 changed state from live to died with no deletion.",
+    "/Users/hermes/.ringer/forensics/stale-run-reconcile-20260714T214811Z/receipt.json records cause='Ringside /api/runs scans persisted run JSON directly; active registry pruning does not mutate stale run JSON after abrupt orchestrator death'.",
+    "The SQLite read model at /Users/hermes/.ringer/ringer.db is derived from runs.jsonl attempts; immutable read-only inspection found no run-state table that would repair ~/.ringer/runs/*.json."
+  ],
+  "supported_reconciliation": {
+    "active_registry": "read_active_runs() / _prune_active_runs() is the supported active-runs.json liveness cleanup path, but it only reconciles the active registry.",
+    "artifact_library": "reconcile_artifact_library_dead_runs(state_dir) is the supported artifact-library reconciliation seam for dead current_run_id entries; it is used by RunStateWriter startup and /api/library.",
+    "read_model_db": "ringer.py db rebuild, implemented by rebuild_read_model_db(), is the supported rebuild seam for the derived SQLite model from runs.jsonl, catalog, and registry data; it is not a run-state liveness repair.",
+    "run_state_gap": "There is no general supported in-place reconciliation seam for ~/.ringer/runs/*.json stale live states in /api/runs. Any new seam should be explicit, receipt-backed, and should preserve forensic receipts with no deletion."
+  },
+  "regression_test": {
+    "smallest": "Add a focused test in tests/test_hud_server.py that writes one run JSON with state='live', finished=false, pid=99999999, leaves active-runs.json empty, calls the same /api/runs path or scan_hud_run_states projection, and asserts the returned run is classified as died rather than live while the source run JSON still exists.",
+    "why_this_test": "tests/test_active_runs.py already proves active-runs pruning, and tests/test_artifact_library.py already proves library reconciliation. The missing coverage is the /api/runs read path that Ringside uses.",
+    "preservation_assertion": "The test should assert no deletion of the run JSON and no deletion of any existing forensic directory; if an explicit write reconciliation is added, it should also assert a backup/diff/receipt is written before mutation."
+  },
+  "minimal_fix": "Normalize stale live runs at the /api/runs seam or in scan_hud_run_states(): when a run JSON says state='live' and finished=false but its run_id is absent from the pruned active registry and its pid raises ProcessLookupError, return a died projection or route through an explicit receipt-backed reconcile_run_state command. Do not delete run JSON, artifacts, logs, receipts, or forensic bundles. If choosing mutation instead of projection, first copy the original state file into ~/.ringer/forensics/<operation>/, write a diff and receipt, then change only state/reconciled_at/reconciliation_reason.",
+  "preservation_rule": "preserve forensic receipts; no deletion. Keep /Users/hermes/.ringer/forensics/stale-run-reconcile-20260714T214811Z and all run JSON, artifact HTML, deliverables, logs, runs.jsonl rows, and launch receipts intact.",
+  "risks": [
+    "PID reuse: a stale run JSON contains only a PID, so reconciliation should require both run_id absence from active-runs.json and pid absence, and should avoid treating PermissionError as dead.",
+    "Sandbox visibility: ps/pgrep were blocked and os.kill can raise PermissionError for live processes outside the sandbox; ProcessLookupError for 49609 and 78643 is strong dead-process evidence, but PermissionError should be treated as unknown/alive.",
+    "/api/library is not read-only in practice because it can write artifacts/library.json during reconciliation.",
+    "ringer.py db rebuild repairs only the derived SQLite read model, not persisted run-state JSON.",
+    "Manual cleanup or deletion would destroy the forensic chain needed to explain why 49609 and 78643 appeared in stale-state handling."
+  ],
+  "confidence": {
+    "level": "high",
+    "reason": "The same root cause is independently supported by code inspection, live state files, immutable SQLite inspection, target PID ProcessLookupError results, and the preserved stale-run reconciliation receipt for 78643. Confidence is not absolute because process listing was blocked by the sandbox and the Ringside API was transient after one successful /api/runs probe."
+  }
+}

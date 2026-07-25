@@ -1,0 +1,12 @@
+{
+  "compose_up": true,
+  "health_green": true,
+  "auth_gate_on": true,
+  "surfaces": {
+    "8080": "listening - agent API",
+    "8002": "listening - MCP server"
+  },
+  "health_response": {"status":"ok","checks":{"valkey":{"status":"ok"},"searxng":{"status":"ok"},"scraper":{"status":"ok"},"browser":{"status":"ok"},"portal":{"status":"ok"}}},
+  "unauth_http_code": "403",
+  "status": "P1_OK"
+}

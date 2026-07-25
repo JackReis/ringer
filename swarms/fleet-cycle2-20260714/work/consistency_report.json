@@ -1,0 +1,363 @@
+{
+  "total_files": 21,
+  "all_pass": true,
+  "files": [
+    {
+      "agent_id": "0b902be0-2365-4599-b86d-bf177caf5550",
+      "agent_name": "Forge",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "1029acc4-868f-41e4-8754-a52b9e7f3936",
+      "agent_name": "Hermes Mistral",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "181f381b-3b7d-4b6c-948d-534d74693108",
+      "agent_name": "Coder",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "36883c53-e6e3-40c6-960e-b3b4afa08b02",
+      "agent_name": "Compass",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "3fad92dc-255f-4223-8899-ce8516a1c99e",
+      "agent_name": "Watchdog",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "62fd39cb-15c8-4562-8866-6cf423ad5ad1",
+      "agent_name": "Cortex",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "6f075642-4fed-4b04-9f00-ac2fa9e58402",
+      "agent_name": "Analyst-Opus",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "717f29e6-3656-436d-bdad-4e8851dddd0d",
+      "agent_name": "Press",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "785cac12-fd63-4fe3-a54b-4d084652c385",
+      "agent_name": "Researcher",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "80284e06-41ab-415a-ba1c-6c3121debd0d",
+      "agent_name": "Wings",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "8b6ea7f8-781e-49ce-8c37-4f5564fc7481",
+      "agent_name": "Bright",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "a5d0eb09-5961-4952-b114-d1111180711a",
+      "agent_name": "Operator",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "c093061e-ac83-432b-895e-e10dd6c5d9ce",
+      "agent_name": "Scout",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "d4bcfdbe-9ddb-4ecd-b68f-a1aef6ae088d",
+      "agent_name": "Task Rabbit",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "d839443a-a592-4dff-86bb-58065f0c24ed",
+      "agent_name": "Quill",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "dc2ca597-dd20-4a73-9fd3-8bef3da92ea9",
+      "agent_name": "Coordinator",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "e6ec3f05-8ac0-4770-960f-0bb01113324f",
+      "agent_name": "Analyst-Sonnet",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "e8958dac-94da-4c9b-bb62-f046488a9e86",
+      "agent_name": "Analyst-Gemini",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "f1ef5e14-d8d4-4030-9e37-7b4fc764ce3d",
+      "agent_name": "Fable",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "f7782341-fbce-44af-b95c-95f4ee3879ca",
+      "agent_name": "Hermes Coder",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    },
+    {
+      "agent_id": "faeb5bd1-48c6-4b8d-b365-cf95a8335170",
+      "agent_name": "Sentry",
+      "checks": {
+        "heading_h1": true,
+        "ringer_governance": true,
+        "fleet_context": true,
+        "runtime_context_h3": true,
+        "memory_planes_h3": true,
+        "surfaces_ref": true,
+        "fleet_base_ref": true,
+        "herdr_ref": true,
+        "section_order": true,
+        "no_duplicates": true
+      },
+      "issues": []
+    }
+  ]
+}

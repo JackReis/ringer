@@ -1,0 +1,43 @@
+{
+  "run_name": "{{ROUTINE_NAME}}-fanout",
+  "workdir": "{{WORKDIR}}",
+  "max_parallel": 3,
+  "tasks": [
+    {
+      "key": "routine-task-1",
+      "task_type": "{{TASK_TYPE}}",
+      "spec": "{{TASK_1_SPEC — describe the concrete deliverable this task produces, e.g. 'Create a file called report.md containing a summary of the routine objectives and current progress. Include sections for Objective, Methodology, and Results.'}}",
+      "check": "{{TASK_1_CHECK}}",
+      "expect_files": ["{{TASK_1_EXPECT_FILE}}"],
+      "model": "{{MODEL}}",
+      "verified": "{{TASK_1_VERIFIED}}",
+      "paperclip_issue": "{{PAPERCLIP_ISSUE}}",
+      "routine_id": "{{ROUTINE_ID}}",
+      "goal_id": "{{GOAL_ID}}"
+    },
+    {
+      "key": "routine-task-2",
+      "task_type": "{{TASK_TYPE}}",
+      "spec": "{{TASK_2_SPEC — describe the concrete deliverable, e.g. 'Create a file called analysis.md containing a detailed analysis of the routine dependencies and integration points. Include at least 3 sections with evidence.'}}",
+      "check": "{{TASK_2_CHECK}}",
+      "expect_files": ["{{TASK_2_EXPECT_FILE}}"],
+      "model": "{{MODEL}}",
+      "verified": "{{TASK_2_VERIFIED}}",
+      "paperclip_issue": "{{PAPERCLIP_ISSUE}}",
+      "routine_id": "{{ROUTINE_ID}}",
+      "goal_id": "{{GOAL_ID}}"
+    },
+    {
+      "key": "routine-task-3",
+      "task_type": "{{TASK_TYPE}}",
+      "spec": "{{TASK_3_SPEC — describe the concrete deliverable, e.g. 'Create a file called checklist.md containing a verification checklist with at least 5 items confirming the routine outputs meet acceptance criteria.'}}",
+      "check": "{{TASK_3_CHECK}}",
+      "expect_files": ["{{TASK_3_EXPECT_FILE}}"],
+      "model": "{{MODEL}}",
+      "verified": "{{TASK_3_VERIFIED}}",
+      "paperclip_issue": "{{PAPERCLIP_ISSUE}}",
+      "routine_id": "{{ROUTINE_ID}}",
+      "goal_id": "{{GOAL_ID}}"
+    }
+  ]
+}

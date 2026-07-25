@@ -1,0 +1,29 @@
+{
+  "run_name": "openai-session-integration-v1",
+  "workdir": "/Users/hermes/.ringer/work/openai-session-integration-v1",
+  "risk": "low",
+  "orchestrator": {
+    "provider": "local",
+    "model": "mock",
+    "family": "deterministic",
+    "runtime": "hermes-ringer",
+    "attestation": "Zero-cost verification of ChatGPT and Codex integration into the federated session corpus"
+  },
+  "max_parallel": 1,
+  "worktrees": false,
+  "tasks": [
+    {
+      "key": "verify-openai-session-corpus",
+      "engine": "mock",
+      "task_type": "session-corpus-verification",
+      "paperclip_issue": "JAC-3669",
+      "spec": "MOCK_FILE: evidence.json\n{\"contract\":\"openai-session.v1\",\"authority\":\"aegis\",\"source_host\":\"talaris\",\"providers\":[\"chatgpt\",\"codex\"]}\nMOCK_END",
+      "check": "python3 -c 'import json,sqlite3; from pathlib import Path; root=Path(\"/Users/hermes/fleet/session-corpus\"); state=json.loads((root/\"federated-session-refresh-state.json\").read_text()); counts=state[\"counts\"]; sources={item[\"source_id\"]:item for item in state[\"session_sources\"]}; db=sqlite3.connect(root/\"federated-sessions.sqlite3\"); total,distinct=db.execute(\"select count(*),count(distinct stable_id) from records\").fetchone(); db.close(); assert counts.get(\"chatgpt\",0)>=100; assert counts.get(\"codex\",0)>=1100; assert sources[\"talaris-codex-snapshot\"][\"verification\"]==\"VERIFIED\"; assert sources[\"talaris-chatgpt-cache-snapshot\"][\"verification\"]==\"VERIFIED\"; assert total==distinct==state[\"row_count\"]==sum(counts.values()); assert state[\"remote_publish\"][\"ok\"] is True; print(\"PASS: %s unique records; ChatGPT=%s Codex=%s\" % (total, counts.get(\"chatgpt\"), counts.get(\"codex\")))'",
+      "expect_files": [
+        "evidence.json"
+      ],
+      "timeout_s": 60,
+      "verified": "The Aegis corpus contains unique stable records for both providers, observed Talaris snapshots, and a successfully published fleet-state projection."
+    }
+  ]
+}

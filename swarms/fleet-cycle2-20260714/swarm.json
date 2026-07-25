@@ -1,0 +1,41 @@
+{
+  "run_name": "fleet-cycle2-20260714",
+  "workdir": "/Users/hermes/ringer/swarms/fleet-cycle2-20260714/work",
+  "max_parallel": 3,
+  "identity": "aegis",
+  "tasks": [
+    {
+      "key": "cross-host-tunnel-verify",
+      "task_type": "probe",
+      "engine": "codex",
+      "model": "gpt-5.6-sol",
+      "timeout_s": 120,
+      "expect_files": ["tunnel_verify.sh", "tunnel_report.json"],
+      "spec": "Write and execute a shell script ./tunnel_verify.sh that verifies cross-host SSH tunnels from Talaris to Aegis are live and forwarding correctly.\n\nThe script must:\n1. SSH to talaris (100.97.178.76 or hostname 'talaris') and check that these launchd tunnel services are loaded:\n   - ai.paperclip-aegis-tunnel\n   - ai.bifrost-aegis-tunnel\n   - ai.ringside-aegis-tunnel\n2. From Talaris, curl each tunneled endpoint and record HTTP status codes:\n   - http://127.0.0.1:3110/api (Paperclip via tunnel — expect 404 or 200, just needs to respond)\n   - http://127.0.0.1:8078/health (Bifrost via tunnel — expect 200)\n   - http://127.0.0.1:8700 (Ringside via tunnel — expect 200 or 404, just needs to respond)\n3. Write a JSON report to ./tunnel_report.json with structure: {\"tunnels\": [{\"name\": \"paperclip\", \"launchd_loaded\": true/false, \"local_port\": 3110, \"http_status\": code_or_null, \"reachable\": true/false, \"error\": msg_or_null}, ...]}\n4. Print a summary to stdout\n\nUse shell commands (ssh, curl, launchctl) and jq for JSON. The script should use 'set -eu' and handle errors gracefully.",
+      "check": "set -eu; bash tunnel_verify.sh >tunnel.out 2>&1 || { echo 'FAIL: script exited non-zero'; cat tunnel.out; exit 1; }; python3 -c \"import json; r=json.load(open('tunnel_report.json')); assert isinstance(r['tunnels'], list), 'FAIL: tunnels must be a list'; assert len(r['tunnels']) == 3, f'FAIL: expected 3 tunnels, got {len(r[\\\"tunnels\\\"])}'; loaded=[t for t in r['tunnels'] if t.get('launchd_loaded')]; reachable=[t for t in r['tunnels'] if t.get('reachable')]; print(f'Tunnels={len(r[\\\"tunnels\\\"])} Loaded={len(loaded)} Reachable={len(reachable)}'); assert len(loaded) == 3, f'FAIL: only {len(loaded)} tunnels loaded, expected 3'; assert len(reachable) >= 2, f'FAIL: only {len(reachable)} tunnels reachable, expected at least 2'; print('PASS: all 3 cross-host tunnels verified live from Talaris side.')\"",
+      "verified": "SSH'd to Talaris and confirmed all 3 launchd tunnel services are loaded and forwarding to Aegis endpoints (Paperclip, Bifrost, Ringside)."
+    },
+    {
+      "key": "instruction-consistency-audit",
+      "task_type": "persona-review",
+      "engine": "codex",
+      "model": "gpt-5.6-sol",
+      "timeout_s": 120,
+      "expect_files": ["consistency_audit.py", "consistency_report.json"],
+      "spec": "Write and execute a Python script ./consistency_audit.py that audits all 21 Paperclip agent instruction files for structural consistency.\n\nAgent instruction files live at /Users/hermes/.paperclip/instances/default/companies/87c32b8e-f131-4df8-ad8e-963d01b458e7/agents/<agent-uuid>/instructions/AGENTS.md\n\nThe script must check each file for:\n1. First line starts with '# ' (agent name heading)\n2. Contains '## Ringer Governance' section\n3. Contains '## Fleet Context' section\n4. Under Fleet Context, has '### Runtime Context' (h3, not h2)\n5. Under Fleet Context, has '### Memory Planes' (h3, not h2)\n6. References 'fleet-surfaces-index.md'\n7. References 'fleet-base.md'\n8. Contains 'Herdr' or 'herdr' reference\n9. Section order: Ringer Governance appears before Fleet Context\n10. No duplicate sections (e.g., two '## Fleet Context' blocks)\n\nWrite a JSON report to ./consistency_report.json with structure:\n{\"total_files\": N, \"all_pass\": true/false, \"files\": [{\"agent_id\": uuid, \"agent_name\": name_from_first_line, \"checks\": {\"heading_h1\": true/false, \"ringer_governance\": true/false, \"fleet_context\": true/false, \"runtime_context_h3\": true/false, \"memory_planes_h3\": true/false, \"surfaces_ref\": true/false, \"fleet_base_ref\": true/false, \"herdr_ref\": true/false, \"section_order\": true/false, \"no_duplicates\": true/false}, \"issues\": [list of any issue strings]}]}\n\nPrint a summary table to stdout showing pass/fail per file. Use only Python standard library.",
+      "check": "set -eu; python3 consistency_audit.py >audit.out 2>&1 || { echo 'FAIL: script exited non-zero'; cat audit.out; exit 1; }; python3 -c \"import json; r=json.load(open('consistency_report.json')); assert r['total_files'] >= 20, f'FAIL: only {r[\\\"total_files\\\"]} files scanned'; failing=[f for f in r['files'] if not all(f['checks'].values())]; if failing: print('FAIL: ' + str(len(failing)) + ' files have issues:'); [print(f'  {f[\\\"agent_id\\\"][:8]}... {f[\\\"issues\\\"]}') for f in failing]; exit 1; else: print(f'PASS: all {r[\\\"total_files\\\"]} agent instruction files pass all 10 structural checks.'); exit 0\"",
+      "verified": "All 21 agent instruction files pass 10 structural consistency checks including heading levels, section order, references, and no duplicates."
+    },
+    {
+      "key": "fleet-base-roster-update",
+      "task_type": "docs",
+      "engine": "codex",
+      "model": "gpt-5.6-sol",
+      "timeout_s": 120,
+      "expect_files": ["roster_update.py", "roster_update_report.json"],
+      "spec": "Write and execute a Python script ./roster_update.py that updates fleet-base.md to reflect the actual live Paperclip API roster.\n\nfleet-base.md is at /Users/hermes/.paperclip/instances/default/companies/87c32b8e-f131-4df8-ad8e-963d01b458e7/fleet-base.md\nPaperclip API is at http://127.0.0.1:3100/api/companies/87c32b8e-f131-4df8-ad8e-963d01b458e7/agents\n\nThe script must:\n1. Query the Paperclip API to get the live agent list (use urllib.request, no auth needed for GET)\n2. Read fleet-base.md and find the '## Fleet Roster' heading line which contains the agent count in parentheses\n3. Count the actual agents from the API (exclude _test_probe from the 'real' count)\n4. If the roster heading says '22 agents' but the API has 22 including _test_probe, update the heading to say '21 agents (+1 test probe pending API deletion)' or similar accurate phrasing\n5. Do NOT modify any other part of fleet-base.md — only the roster count line if it needs updating\n6. Write a JSON report to ./roster_update_report.json: {\"api_agent_count\": N, \"api_agents_including_probe\": N, \"fleet_base_says\": \"original line text\", \"updated_to\": \"new line text or 'no change needed'\", \"changed\": true/false}\n7. Print a summary to stdout\n\nUse only Python standard library.",
+      "check": "set -eu; python3 roster_update.py >roster.out 2>&1 || { echo 'FAIL: script exited non-zero'; cat roster.out; exit 1; }; python3 -c \"import json; r=json.load(open('roster_update_report.json')); assert r['api_agent_count'] > 0, 'FAIL: no agents from API'; print(f'API agents (excl probe)={r[\\\"api_agent_count\\\"]} changed={r[\\\"changed\\\"]}'); print(f'  fleet-base line: {r[\\\"updated_to\\\"]}'); print('PASS: fleet-base.md roster count verified/updated against live API.')\"",
+      "verified": "fleet-base.md roster heading reflects the actual live API agent count (excluding the pending-deletion test probe)."
+    }
+  ]
+}

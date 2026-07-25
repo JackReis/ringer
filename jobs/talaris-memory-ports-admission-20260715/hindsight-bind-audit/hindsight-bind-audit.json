@@ -1,0 +1,69 @@
+{
+  "schema_version": "1.0",
+  "checked_at": "2026-07-14T22:43:34Z",
+  "bead": "hermes-24i8",
+  "talaris_hostname": "Talaris",
+  "endpoint_probes": [
+    {
+      "port": 9177,
+      "status": "listening",
+      "protocol": "tcp",
+      "service": "hindsight-api"
+    },
+    {
+      "port": 8888,
+      "status": "not listening",
+      "protocol": "tcp",
+      "service": "unknown"
+    }
+  ],
+  "listener_evidence": [
+    {
+      "process_id": 4659,
+      "port": 9177,
+      "address": "localhost:9177",
+      "status": "LISTEN"
+    }
+  ],
+  "process_evidence": [
+    {
+      "pid": 4659,
+      "command": "/Users/jack.reis/.hermes/hermes-agent/.venv/bin/python /Users/jack.reis/.hermes/hermes-agent/.venv/bin/hindsight-api --daemon --idle-timeout 0 --port 9177",
+      "user": "jack.reis",
+      "args": [
+        "--daemon",
+        "--idle-timeout",
+        "0",
+        "--port",
+        "9177"
+      ]
+    }
+  ],
+  "launchd_evidence": [],
+  "script_or_config_evidence": [],
+  "configured_port_claim": 9177,
+  "observed_bind_port": 9177,
+  "mismatch_verified": true,
+  "root_cause": "The hindsight daemon process (PID 4659) is configured to bind to port 9177 via the command line argument --port 9177. However, the bead claim incorrectly states that the service binds to port 8888 while the actual listening service is using port 9177.",
+  "minimal_reversible_fix": "Update the bead configuration to claim that the service binds to port 9177 instead of 8888.",
+  "no_change_option": "The existing configuration could remain as-is, but this would perpetuate an incorrect claim about which port is being used by the service.",
+  "executable_verification_plan": [
+    "Confirm the process argument in ps aux",
+    "Verify lsof output matches --port value",
+    "Check that no other services are bound to port 8888"
+  ],
+  "rollback": "To rollback, one would need to change the bead claim from 8888 back to 9177 or correct any configuration files that reference the wrong port.",
+  "commands_run": [
+    "ssh talaris 'ps aux | grep -i hindsight'",
+    "ssh talaris 'lsof -p 4659'",
+    "ssh talaris 'ps -p 4659 -o args='",
+    "ssh talaris 'lsof -i :8888'",
+    "ssh talaris 'netstat -an | grep LISTEN | grep -E \"(8888|9177)\"'"
+  ],
+  "caveats": [
+    "Only non-secret metadata was examined per requirements",
+    "The service is actively listening on port 9177 and not 8888",
+    "Process arguments directly specify --port 9177 which matches what's bound",
+    "There are no other services visible using port 8888"
+  ]
+}

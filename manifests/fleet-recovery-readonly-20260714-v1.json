@@ -1,0 +1,51 @@
+{
+  "run_name": "fleet-recovery-readonly-20260714-v1",
+  "workdir": "/Users/hermes/ringer/jobs/fleet-recovery-readonly-20260714-v1",
+  "max_parallel": 4,
+  "tasks": [
+    {
+      "key": "beads_authority",
+      "task_type": "beads-audit",
+      "engine": "codex",
+      "timeout_s": 900,
+      "paperclip_issue": "JAC-3446",
+      "expect_files": ["beads-authority.json"],
+      "spec": "You are the authoritative Beads evidence typist. READ-ONLY ONLY. The canonical store is on Talaris at /Users/jack.reis/Documents/=notes, reachable with ssh talaris. Do not use Aegis-local Beads as task truth. Run live read-only bd status/stats/list queries on Talaris. Write ./beads-authority.json as valid JSON with checked_at, source_host, source_path, schema_version, summary (total_issues, closed_issues, open_issues, in_progress_issues, blocked_issues, deferred_issues, ready_issues), evidence_safe_actions, human_gated_examples, contradictions, and recommendation. evidence_safe_actions must be an array containing only duplicates, explicit test probes, or items with executable completion evidence; use an empty array rather than guessing. Include the exact terms authoritative Talaris Beads, evidence-safe, and human-gated. Do not mutate, comment, claim, close, sync, or push anything.",
+      "check": "/Users/hermes/homebrew/bin/python3 -c \"import json,subprocess,sys; d=json.load(open('beads-authority.json')); live=json.loads(subprocess.check_output(['ssh','talaris','bd','-C','/Users/jack.reis/Documents/=notes','--readonly','status','--json'],text=True)); a=d.get('summary',{}); b=live.get('summary',{}); keys=['total_issues','closed_issues','open_issues','in_progress_issues','blocked_issues','deferred_issues','ready_issues']; diff={k:(a.get(k),b.get(k)) for k in keys if a.get(k)!=b.get(k)}; (d.get('source_host')=='Talaris' and d.get('source_path')=='/Users/jack.reis/Documents/=notes' and not diff and isinstance(d.get('evidence_safe_actions'),list) and isinstance(d.get('human_gated_examples'),list)) or sys.exit('FAIL: source/diff/schema mismatch %r' % diff); print('authoritative Talaris Beads verified live: %s' % b)\"",
+      "verified": "beads-authority.json matches a fresh independent bd status read from the authoritative Talaris store and separates evidence-safe from human-gated work"
+    },
+    {
+      "key": "dispatch_diagnosis",
+      "task_type": "root-cause-analysis",
+      "engine": "codex",
+      "timeout_s": 900,
+      "paperclip_issue": "JAC-3447",
+      "expect_files": ["dispatch-diagnosis.json"],
+      "spec": "You are the dispatch-timeout diagnosis typist. READ-ONLY ONLY. Diagnose cron 738f3798d377 (Beads→Paperclip hourly dispatch) on Talaris. Inspect /Users/jack.reis/.hermes/scripts/beads-paperclip-dispatch.sh and beads-paperclip-dispatch.py over ssh talaris, cron history/output, process state, and make one bounded dry-run reproduction if it is guaranteed non-mutating. Trace the exact blocking or unbounded call; do not guess. Write ./dispatch-diagnosis.json with checked_at, cron_job_id, wrapper_path, script_path, observed_failure, reproduction_command, reproduction_exit_or_timeout, root_cause, causal_evidence (array), red_command, green_condition, minimal_fix, risks, and confidence. Include the exact terms 738f3798d377, 120s, authoritative Talaris Beads, and read-only. Do not edit scripts, cron jobs, Beads, or Paperclip.",
+      "check": "/Users/hermes/homebrew/bin/python3 -c \"import json,sys; d=json.load(open('dispatch-diagnosis.json')); req=['checked_at','observed_failure','reproduction_command','root_cause','causal_evidence','red_command','green_condition','minimal_fix','confidence']; miss=[k for k in req if not d.get(k)]; (d.get('cron_job_id')=='738f3798d377' and d.get('wrapper_path')=='/Users/jack.reis/.hermes/scripts/beads-paperclip-dispatch.sh' and d.get('script_path')=='/Users/jack.reis/.hermes/scripts/beads-paperclip-dispatch.py' and not miss and isinstance(d.get('causal_evidence'),list) and len(d['causal_evidence'])>=2) or sys.exit('FAIL: missing=%r ids/paths invalid' % miss); print('dispatch diagnosis schema and causal evidence verified')\"",
+      "verified": "dispatch-diagnosis.json identifies a reproducible causal timeout path with a red command, green condition, and bounded minimal fix without mutating the dispatcher"
+    },
+    {
+      "key": "ringer_state_diagnosis",
+      "task_type": "observability-audit",
+      "engine": "codex",
+      "timeout_s": 900,
+      "paperclip_issue": "JAC-3448",
+      "expect_files": ["ringer-state-diagnosis.json"],
+      "spec": "You are the Ringer stale-state diagnosis typist on Aegis. READ-ONLY ONLY. Inspect /Users/hermes/ringer, ~/.ringer run state, the Ringside API if available, and PIDs 49609 and 78643. Determine why dead processes can remain marked live and identify the supported reconciliation/rebuild seam plus the smallest regression test. Preserve every forensic file. Write ./ringer-state-diagnosis.json with checked_at, repo, pids (object keyed by pid with exists and evidence), ringside_active, stale_records, root_cause, causal_evidence, supported_reconciliation, regression_test, minimal_fix, preservation_rule, risks, and confidence. Include exact terms 49609, 78643, preserve forensic receipts, and no deletion. Do not modify source, databases, run JSON, launchd, or processes.",
+      "check": "/Users/hermes/homebrew/bin/python3 -c \"import json,os,sys; d=json.load(open('ringer-state-diagnosis.json')); ps=d.get('pids',{}); alive={p:os.path.exists('/proc/'+p) for p in ['49609','78643']} if sys.platform.startswith('linux') else {p:(os.system('kill -0 '+p+' >/dev/null 2>&1')==0) for p in ['49609','78643']}; claimed={p:bool((ps.get(p) or {}).get('exists')) for p in ['49609','78643']}; req=['root_cause','causal_evidence','supported_reconciliation','regression_test','minimal_fix','preservation_rule']; miss=[k for k in req if not d.get(k)]; (d.get('repo')=='/Users/hermes/ringer' and not miss and claimed==alive and isinstance(d.get('stale_records'),list)) or sys.exit('FAIL: missing=%r pid_claimed=%r live=%r' % (miss,claimed,alive)); print('Ringer stale-state evidence verified against current PIDs')\"",
+      "verified": "ringer-state-diagnosis.json agrees with independent PID liveness checks and specifies a receipt-preserving reconciliation and regression-test seam"
+    },
+    {
+      "key": "sally_directions_evidence",
+      "task_type": "source-audit",
+      "engine": "codex",
+      "timeout_s": 900,
+      "paperclip_issue": "JAC-3449",
+      "expect_files": ["sally-directions-evidence.json"],
+      "spec": "You are the Sally directions evidence typist. READ-ONLY ONLY. Inspect the clean JAC-3440 worktree under /Users/hermes/Projects/Sea Ranch AI/.paperclip/worktrees/ and the canonical production surface https://sally.oursearanchhome.com. Locate directGroundedAnswer(), current directions handlers, guest-resources corpus entries, source URLs, and exact frontend starter queries. Do not infer a route from memory. Write ./sally-directions-evidence.json with checked_at, worktree, production_url, current_behavior (array of live query/response summaries), canonical_sources (array with title and url), route_facts (array, each with fact and source_url), realtime_deference (array), exact_queries_to_test, required_handler_patterns, regression_assertions, risks, and recommendation. Deference must cover live navigation, road closures, weather, and official/local emergency guidance. Include the exact terms directGroundedAnswer, sally.oursearanchhome.com, real-time, road closures, and weather. Do not edit or commit anything.",
+      "check": "/Users/hermes/homebrew/bin/python3 -c \"import json,sys,urllib.request; d=json.load(open('sally-directions-evidence.json')); urls=[x.get('url') for x in d.get('canonical_sources',[]) if isinstance(x,dict)]; terms=' '.join(map(str,[d.get('realtime_deference'),d.get('required_handler_patterns'),d.get('regression_assertions')])).lower(); req=['current_behavior','route_facts','exact_queries_to_test','required_handler_patterns','regression_assertions']; miss=[k for k in req if not d.get(k)]; live=json.loads(urllib.request.urlopen('https://sally.oursearanchhome.com/health',timeout=15).read()); (d.get('production_url')=='https://sally.oursearanchhome.com' and live.get('status')=='ok' and len(urls)>=1 and all(u and u.startswith('http') for u in urls) and not miss and all(t in terms for t in ['road closure','weather','navigation'])) or sys.exit('FAIL: live=%r urls=%r missing=%r terms=%r' % (live,urls,miss,terms)); print('Sally evidence schema, sources, deference, and production health verified')\"",
+      "verified": "sally-directions-evidence.json is grounded in canonical URLs, names exact regression queries, includes live-navigation/closure/weather deference, and is checked against production health"
+    }
+  ]
+}

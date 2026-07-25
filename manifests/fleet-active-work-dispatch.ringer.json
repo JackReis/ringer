@@ -1,0 +1,43 @@
+{
+  "run_name": "fleet-active-work-dispatch",
+  "workdir": "/Users/hermes/.ringer/work/fleet-active-work-dispatch",
+  "risk": "low",
+  "orchestrator": {
+    "provider": "local",
+    "model": "mock",
+    "family": "deterministic",
+    "runtime": "hermes-ringer",
+    "attestation": "Zero-token active-work snapshot and shared Aegis/Talaris trigger-contract verification"
+  },
+  "max_parallel": 2,
+  "worktrees": false,
+  "tasks": [
+    {
+      "key": "capture-active-paperclip-work",
+      "engine": "mock",
+      "task_type": "coordination-snapshot",
+      "paperclip_issue": "JAC-3788",
+      "spec": "MOCK_FILE: run-contract.json\n{\"contract\":\"fleet-active-work-dispatch.v1\",\"paperclip_issue\":\"JAC-3788\",\"runner\":\"aegis\",\"replica\":\"talaris-read-only\",\"lifecycle_writes\":false,\"model_tokens\":0}\nMOCK_END",
+      "check": "python3 /Users/hermes/ringer/tools/fleet_active_work_snapshot.py --output active-work-snapshot.json && python3 -c 'import json; from pathlib import Path; contract=json.loads(Path(\"run-contract.json\").read_text()); snapshot=json.loads(Path(\"active-work-snapshot.json\").read_text()); assert contract[\"paperclip_issue\"]==snapshot[\"paperclip_issue\"]==\"JAC-3788\"; assert contract[\"runner\"]==\"aegis\"; assert contract[\"replica\"]==\"talaris-read-only\"; assert contract[\"lifecycle_writes\"] is False; assert snapshot[\"active_issue_count\"]>=1; assert len(snapshot[\"tracked_priorities\"])==6; print(\"PASS: active portfolio snapshot verified without lifecycle writes\")'",
+      "expect_files": [
+        "run-contract.json",
+        "active-work-snapshot.json"
+      ],
+      "timeout_s": 90,
+      "verified": "The run queries live Paperclip coordination state, produces a bounded portfolio snapshot, and performs no authoritative lifecycle writes."
+    },
+    {
+      "key": "verify-cross-host-trigger-contract",
+      "engine": "mock",
+      "task_type": "coordination-smoke",
+      "paperclip_issue": "JAC-3788",
+      "spec": "MOCK_FILE: trigger-contract.json\n{\"paperclip_issue\":\"JAC-3788\",\"aegis_command\":\"RINGER_NO_CATALOG_REFRESH=1 /Users/hermes/.local/bin/ringer run /Users/hermes/ringer/manifests/fleet-active-work-dispatch.ringer.json --identity hermes-ringer --no-dashboard\",\"talaris_command\":\"ssh aegis 'RINGER_NO_CATALOG_REFRESH=1 /Users/hermes/.local/bin/ringer run /Users/hermes/ringer/manifests/fleet-active-work-dispatch.ringer.json --identity hermes-ringer --no-dashboard'\",\"shared_surface\":\"paperclip\",\"authoritative_runner\":\"aegis\",\"replica_mode\":\"read-only\"}\nMOCK_END",
+      "check": "python3 -c 'import json; from pathlib import Path; d=json.loads(Path(\"trigger-contract.json\").read_text()); assert d[\"paperclip_issue\"]==\"JAC-3788\"; assert d[\"shared_surface\"]==\"paperclip\"; assert d[\"authoritative_runner\"]==\"aegis\"; assert d[\"replica_mode\"]==\"read-only\"; assert d[\"aegis_command\"].startswith(\"RINGER_NO_CATALOG_REFRESH=1\"); assert d[\"talaris_command\"].startswith(\"ssh aegis\"); print(\"PASS: both-host trigger contract verified\")'",
+      "expect_files": [
+        "trigger-contract.json"
+      ],
+      "timeout_s": 60,
+      "verified": "Aegis owns execution while both machines share the same Paperclip coordination pointer and deterministic trigger command."
+    }
+  ]
+}

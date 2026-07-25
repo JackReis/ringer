@@ -1,0 +1,94 @@
+{
+  "addresses_revise": "Seatbelt blocks SSH; package fresh live output for Judge and retain outside-sandbox post-check",
+  "evidence": {
+    "bifrost": {
+      "error_attempt_log_id": "e650aebf-ec0b-43b7-8ae5-7b6fad7d2dc3",
+      "error_attempt_status": "error",
+      "model": "mistral-small-latest",
+      "provider": "mistral",
+      "status": "success",
+      "success_log_id": "cd0389e9-1fba-4919-805f-a296730ad249"
+    },
+    "package_hashes": {
+      "archive-manifest.json": "9a985c5ec4e834ea29a01bda3f3cd729ad24e1ad573253505f4fcfbbd52b6374",
+      "bifrost-receipt.json": "049780972e9610f6d09dba0566d76514183572608caaa0b538a5db3ebffd7f1c",
+      "pre-repair-red.md": "9c1733b34e72ac347c71eee30eff07b01fab5751df1606ef6fe507bfc56d3e3a",
+      "talaris-verifier.py": "9350660a5f5054d4f185bd889d420ed398fdfd3bd6b1caee54cc02022890179e"
+    },
+    "talaris": {
+      "active_projection": {
+        "commit_field_rows": 1352,
+        "excess_duplicate_sections": 0,
+        "retired_header": true,
+        "sections": 1347,
+        "unique_section_identity_tuples": 1347
+      },
+      "bead": {
+        "external_ref": "paperclip://JAC-3383",
+        "id": "notes-4bwsk",
+        "status": "in_progress"
+      },
+      "candidate_commit": "ed159a393b8594587bfce53d59b5a47303498294",
+      "canonical_health": [
+        "overall_status=ok",
+        "ledger_status=ok",
+        "ledger_rows=3045",
+        "ledger_missing_sources=none"
+      ],
+      "executable_consumer_matches": 0,
+      "hashes": {
+        "active": "dec964d98330c56c4d44865d53b6a9c478a5214066525eb2b8e0758102a29db9",
+        "candidate": "dec964d98330c56c4d44865d53b6a9c478a5214066525eb2b8e0758102a29db9",
+        "ledger_py": "0efefe2f9012b030fa569a00afbf8c1b1dd929bd055064ef7a9815d7277fdf4c",
+        "raw": "240e3143520994c7299d20cdcce7358982b8d6c23e1910056eaec143c73876df",
+        "test_ledger_py": "5edc5b7739531a7d7158a230edefee4bfd2ae4f580fbfd72021e36c77868ae92"
+      },
+      "idempotency_smoke": {
+        "excess_duplicate_sections": 0,
+        "first": "[ledger] Commit sync: new=7 skipped=13 total=20",
+        "second": "[ledger] Commit sync: new=0 skipped=20 total=20"
+      },
+      "legacy_audit": {
+        "full_excess_duplicate_rows": 0,
+        "full_sha_rows": 1347,
+        "full_unique_shas": 1347,
+        "recent_distinct_shas_already_in_older_entries": 0,
+        "recent_internal_excess_duplicates": 0,
+        "recent_shas_found": 20,
+        "recent_unique_shas": 20,
+        "requested_recent_count": 20
+      },
+      "no_second_usage_ledger": {
+        "canonical_directories": [
+          "/Users/jack.reis/.hermes/ledger"
+        ],
+        "legacy_projection_contract": "retired historical compatibility projection",
+        "writer_job_ids": [
+          "6c168fc9f871"
+        ]
+      },
+      "paperclip": {
+        "goal_id": "8a713de8-a7df-4934-a475-5e7cf2104610",
+        "judge_status": "blocked",
+        "parent": "JAC-3383",
+        "typist_status": "in_review"
+      },
+      "schedules": {
+        "canonical_sync": {
+          "enabled": true,
+          "id": "6c168fc9f871",
+          "last_status": "ok",
+          "state": "scheduled"
+        },
+        "legacy_writer_matches": 0
+      },
+      "tests": "76 passed"
+    },
+    "talaris_verifier_sha256": "9350660a5f5054d4f185bd889d420ed398fdfd3bd6b1caee54cc02022890179e",
+    "verdict": "PASS"
+  },
+  "generated_at_utc": "2026-07-14T00:58:20.509714+00:00",
+  "generator": "Aegis captain shell outside Ringer Seatbelt: python3 verify.py",
+  "ringer_revise_run_id": "degraded-ledger-resolution-20260714T005153Z-p10629",
+  "verdict": "PASS"
+}

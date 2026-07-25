@@ -1,0 +1,66 @@
+{
+  "run_name": "{{PROJECT}}-pocock-lifecycle",
+  "workdir": "{{WORKDIR}}",
+  "max_parallel": 4,
+  "_description": "Matt Pocock v1.1 development lifecycle as a Ringer swarm: grill → spec → tickets → implement → code-review. Each task uses Pocock skills as agent instructions.",
+  "_skills_required": ["grill-me", "grilling", "to-spec", "to-tickets", "implement", "code-review", "tdd", "wayfinder", "research", "prototype"],
+  "tasks": [
+    {
+      "key": "grilling",
+      "task_type": "grilling",
+      "engine": "{{ENGINE|claude}}",
+      "model": "{{MODEL|claude-cli/claude-opus-4-8}}",
+      "timeout_s": 1800,
+      "expect_files": ["grilling-output.md"],
+      "spec": "Load the /grilling skill (productivity/grilling/SKILL.md). Interview the user relentlessly about the project: {{PROJECT_DESCRIPTION}}. Ask ONE question at a time. Distinguish Facts (found by exploring) from Decisions (user must decide). Do not enact any plan until the user confirms shared understanding. Write the full grilling transcript and outcomes to ./grilling-output.md.",
+      "check": "test -s grilling-output.md && grep -qiE 'decision|question|confirm' grilling-output.md && echo 'grilling OK'",
+      "verified": "grilling-output.md exists, is non-empty, and records decisions/questions"
+    },
+    {
+      "key": "to-spec",
+      "task_type": "spec",
+      "engine": "{{ENGINE|claude}}",
+      "model": "{{MODEL|claude-cli/claude-opus-4-8}}",
+      "timeout_s": 1800,
+      "expect_files": ["spec.md"],
+      "depends_on": ["grilling"],
+      "spec": "Load the /to-spec skill (engineering/to-spec/SKILL.md). Turn the grilling output (./grilling-output.md) into a spec. The spec defines the destination — where we're going with this feature or project. Quiz which modules we're touching. Write the spec to ./spec.md and publish to the issue tracker if configured.",
+      "check": "test -s spec.md && grep -qiE 'module|spec|requirement' spec.md && echo 'to-spec OK'",
+      "verified": "spec.md exists, is non-empty, and references modules/requirements"
+    },
+    {
+      "key": "to-tickets",
+      "task_type": "tickets",
+      "engine": "{{ENGINE|claude}}",
+      "model": "{{MODEL|claude-cli/claude-opus-4-8}}",
+      "timeout_s": 1800,
+      "expect_files": ["tickets.md"],
+      "depends_on": ["to-spec"],
+      "spec": "Load the /to-tickets skill (engineering/to-tickets/SKILL.md). Break the spec (./spec.md) into tracer-bullet vertical slices — each ticket declaring its blocking edges. Write tickets to ./tickets.md (local file mode) or create them in the issue tracker if configured.",
+      "check": "test -s tickets.md && grep -qiE 'ticket|block|depend' tickets.md && echo 'to-tickets OK'",
+      "verified": "tickets.md exists, is non-empty, and references blocking/dependency edges"
+    },
+    {
+      "key": "implement",
+      "task_type": "code-feature",
+      "engine": "{{ENGINE|codex}}",
+      "model": "{{WORKER_MODEL|openrouter/z-ai/glm-5.2}}",
+      "timeout_s": 3600,
+      "depends_on": ["to-tickets"],
+      "spec": "Load the /implement skill (engineering/implement/SKILL.md) and /tdd skill (engineering/tdd/SKILL.md). Implement the first ticket from ./tickets.md. Use TDD where possible: Red (write failing test) → Green (make test pass). Run type checking regularly. Single test files regularly. Do not refactor during implementation — refactoring is handled in code review.",
+      "check": "{{IMPLEMENT_CHECK|test -s implementation-complete.md && echo 'implement OK'}}",
+      "verified": "implementation artifact exists and is non-empty"
+    },
+    {
+      "key": "code-review",
+      "task_type": "review",
+      "engine": "{{ENGINE|claude}}",
+      "model": "{{MODEL|claude-cli/claude-opus-4-8}}",
+      "timeout_s": 1800,
+      "depends_on": ["implement"],
+      "spec": "Load the /code-review skill (engineering/code-review/SKILL.md). Review the implementation on two axes using parallel sub-agents: (1) Standards — does it follow coding standards? Check for Fowler refactoring smells: mysterious name, duplicated code, feature envy, data clumps, primitive obsession, repeated switches, divergent change, speculative generality, message chains, middleman. (2) Spec — does it faithfully implement the originating ticket from ./tickets.md? Write review to ./code-review.md.",
+      "check": "test -s code-review.md && grep -qiE 'standards|spec|smell|review' code-review.md && echo 'code-review OK'",
+      "verified": "code-review.md exists, is non-empty, and covers both axes"
+    }
+  ]
+}

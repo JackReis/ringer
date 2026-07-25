@@ -1,0 +1,209 @@
+{
+  "schema_version": "1.0",
+  "checked_at": "2026-07-15T01:47:20Z",
+  "beads": [
+    {
+      "id": "hermes-w5kk",
+      "title": "Fix OB1 port conflict on Talaris",
+      "live_record_retrieved": false,
+      "assessment": "The record could not be retrieved from the canonical Beads database in this checkout. Its identity and title are supplied by the admission task. No independently verified network evidence supports changing Talaris from 8787 to 8788."
+    },
+    {
+      "id": "hermes-2wn4",
+      "title": "Fix OB1 port conflict on Talaris",
+      "live_record_retrieved": false,
+      "claim": "Talaris localhost:8787 conflicts with Aegis localhost:8787; use 8788.",
+      "assessment": "The claim confuses equal numeric ports in separate host network namespaces with a bind collision. A secondary local reference confirms this bead was created with the 8787-to-8788 note, but the canonical record was unavailable from this checkout."
+    }
+  ],
+  "duplicate_relationship": {
+    "classification": "probable_duplicate",
+    "basis": [
+      "Both bead IDs are presented with the exact same title.",
+      "hermes-2wn4 carries the same proposed remediation that this investigation was admitted to assess.",
+      "Canonical Beads metadata, including dependencies, creation times, notes, and statuses, could not be read from this checkout, so the authoritative duplicate direction is not established."
+    ],
+    "preferred_canonical_record": null
+  },
+  "aegis": {
+    "hostname": "Aegis.local",
+    "identity": {
+      "computer_name": "Aegis",
+      "local_host_name": "Aegis",
+      "os": "Darwin 25.4.0 arm64",
+      "user": "hermes",
+      "live_verified": true
+    },
+    "probes": [
+      {
+        "url": "http://127.0.0.1:8787/health",
+        "result": "connection_refused",
+        "http_status": 0,
+        "live": true
+      },
+      {
+        "url": "http://127.0.0.1:8788/health",
+        "result": "connection_refused",
+        "http_status": 0,
+        "live": true
+      }
+    ],
+    "listener_evidence": [
+      {
+        "address": "127.0.0.1:8787",
+        "state": "LISTEN",
+        "owner": "OrbStack",
+        "pid": 678,
+        "protocol": "TCP/IPv4",
+        "live": true
+      },
+      {
+        "address": "127.0.0.1:8788",
+        "state": "LISTEN",
+        "owner": "OrbStack",
+        "pid": 678,
+        "protocol": "TCP/IPv4",
+        "live": true
+      },
+      {
+        "interpretation": "OrbStack owns host-side published sockets on both ports, but both health connections were refused. This is consistent with unavailable container backends or stale publication state; it is not evidence that Talaris owns either Aegis socket. Docker API inspection was blocked by sandbox permissions."
+      }
+    ]
+  },
+  "talaris": {
+    "hostname": "Talaris",
+    "identity": {
+      "ssh_alias": "talaris",
+      "resolved_host": "100.97.178.76",
+      "resolved_user": "jack.reis",
+      "resolved_port": 22,
+      "live_verified": false,
+      "verification_error": "ssh: connect to host 100.97.178.76 port 22: Operation not permitted"
+    },
+    "probes": [
+      {
+        "url": "http://127.0.0.1:8787/health",
+        "result": "not_executed_on_remote_host",
+        "live": false,
+        "reason": "Outbound SSH was denied by the execution sandbox before the remote curl ran."
+      },
+      {
+        "url": "http://127.0.0.1:8788/health",
+        "result": "not_executed_on_remote_host",
+        "live": false,
+        "reason": "Outbound SSH was denied by the execution sandbox before the remote curl ran."
+      }
+    ],
+    "listener_evidence": [
+      {
+        "ports": [8787, 8788],
+        "result": "not_observed",
+        "live": false,
+        "reason": "Outbound SSH was denied by the execution sandbox before remote lsof ran."
+      }
+    ]
+  },
+  "forwarding_evidence": {
+    "aegis_ssh_client_config": {
+      "talaris_target": "jack.reis@100.97.178.76:22",
+      "local_forward": [],
+      "remote_forward": [],
+      "dynamic_forward": [],
+      "proxy_jump": [],
+      "interpretation": "Filtered ssh -G output contained identity routing fields and no forwarding directives for the talaris alias."
+    },
+    "aegis_live_forward_listeners": {
+      "ssh_owned_8787_or_8788": [],
+      "other_owners": [
+        "OrbStack pid 678 owns 127.0.0.1:8787",
+        "OrbStack pid 678 owns 127.0.0.1:8788"
+      ]
+    },
+    "aegis_remote_url_configuration": {
+      "active_examples": [
+        "/Users/hermes/Library/LaunchAgents/ai.hermes.gateway.plist -> 127.0.0.1:8787",
+        "/Users/hermes/Library/LaunchAgents/ai.hermes.gateway-aegis.plist -> 127.0.0.1:8787",
+        "/Users/hermes/Library/LaunchAgents/ai.hermes.gateway-family.plist -> 127.0.0.1:8787",
+        "/Users/hermes/.hermes/profiles/coder/config.yaml -> localhost:8787",
+        "/Users/hermes/.hermes/profiles/mistral/config.yaml -> localhost:8787"
+      ],
+      "interpretation": "These references select the service in Aegis's own loopback namespace. A URL reference is not a socket bind and cannot collide with Talaris unless accompanied by a tunnel or another bind in the same namespace."
+    },
+    "talaris_forwarding_and_remote_urls": {
+      "result": "not_live_verified",
+      "reason": "The remote host could not be entered from this sandbox. No Aegis-side configured or live SSH forward claiming 8787 or 8788 was observed."
+    }
+  },
+  "conflict_definition": {
+    "genuine_bind_collision": "Two processes attempt incompatible binds to the same protocol, address, and port in the same network namespace, such as two TCP listeners both claiming 127.0.0.1:8787 on Talaris, or an SSH -L/-R endpoint attempting to claim a port already bound in that same host namespace.",
+    "not_a_collision": "Aegis TCP 127.0.0.1:8787 and Talaris TCP 127.0.0.1:8787 are distinct sockets because each host has its own loopback interface and network namespace.",
+    "related_but_distinct_failures": [
+      "A client configured with the wrong remote URL can reach the wrong service or fail to connect, but that is routing/configuration drift rather than a bind collision.",
+      "An SSH tunnel can create a real local or remote bind collision only where its forwarding endpoint tries to listen.",
+      "A published container socket can remain visible while its backend is unhealthy; that is service health or container publication state, not a cross-host port collision."
+    ]
+  },
+  "observed_conflict": false,
+  "conclusion": "No cross-host OB1 port conflict was observed. The premise that Talaris localhost:8787 conflicts merely because Aegis also uses localhost:8787 is technically false. The live Aegis state has separate OrbStack-owned listeners on 8787 and 8788 with refused health connections, which warrants an Aegis backend health investigation but does not justify renumbering Talaris. A complete statement about Talaris's current listener owner and health is withheld because sandbox policy blocked the remote probes.",
+  "recommended_bead_disposition": {
+    "hermes-2wn4": "Do not execute the 8788 change. Mark as premise-invalid and duplicate after attaching a successful fresh Talaris evidence pass, or close as duplicate of hermes-w5kk if hermes-w5kk is chosen as the diagnostic record.",
+    "hermes-w5kk": "Hold without mutation until canonical Beads metadata and fresh Talaris evidence are available. Retain only if reframed from cross-host port conflict to a concrete same-host listener, health, forwarding, or client-routing defect.",
+    "administrative_action_taken": false
+  },
+  "safe_followup": [
+    "From a shell allowed to reach Talaris, run hostname plus lsof on TCP 8787 and 8788, then curl each /health endpoint; record command exit codes and response summaries without headers or environment output.",
+    "On Talaris, inspect filtered ssh -G output and live ssh-owned listeners for -L, -R, or -D endpoints involving 8787 or 8788; do not dump environment variables or credential-bearing command lines.",
+    "Retrieve both canonical Beads records with bd --readonly show and compare status, timestamps, dependencies, and notes before selecting the canonical duplicate.",
+    "Investigate Aegis's refused health probes separately by inspecting non-secret container name/status/port metadata in a shell permitted to read the OrbStack Docker socket. Do not change either host's port until a same-namespace collision or explicit routing requirement is demonstrated."
+  ],
+  "commands_run": [
+    "git status --short --branch",
+    "rg --files -g 'AGENTS.md' -g '!**/.git/**' . ..",
+    "rg -n -i 'hermes-w5kk|hermes-2wn4|OB1 port conflict|8788|Talaris.*8787' /Users/hermes/.codex/memories/MEMORY.md",
+    "command -v bd",
+    "bd show hermes-w5kk --json",
+    "bd show hermes-2wn4 --json",
+    "bd where",
+    "bd where --help",
+    "bd --global --readonly where --json",
+    "bd --global --readonly show hermes-w5kk --json",
+    "bd --global --readonly show hermes-2wn4 --json",
+    "curl -fsS --max-time 3 http://127.0.0.1:3658/health",
+    "hostname",
+    "scutil --get ComputerName",
+    "scutil --get LocalHostName",
+    "uname -srm",
+    "id -un",
+    "curl -fsS --max-time 5 http://127.0.0.1:8787/health",
+    "curl -fsS --max-time 5 http://127.0.0.1:8788/health",
+    "curl -sS --max-time 5 -o /dev/null -w '%{http_code}\\n' http://127.0.0.1:8787/",
+    "lsof -nP -iTCP:8787 -sTCP:LISTEN",
+    "lsof -nP -iTCP:8788 -sTCP:LISTEN",
+    "ssh -G talaris | awk '$1==\"hostname\"||$1==\"user\"||$1==\"port\"||$1==\"localforward\"||$1==\"remoteforward\"||$1==\"dynamicforward\"||$1==\"proxyjump\" {print}'",
+    "docker ps --format '{{json .}}'",
+    "docker ps -a --format '{{json .}}'",
+    "ps -p 678 -o pid=,ppid=,user=,comm=,args=",
+    "lsof -nP -a -p 678 -iTCP:8787 -sTCP:LISTEN",
+    "lsof -nP -a -p 678 -iTCP:8788 -sTCP:LISTEN",
+    "ssh -o BatchMode=yes -o ConnectTimeout=8 talaris 'hostname; scutil --get ComputerName; scutil --get LocalHostName; uname -srm; id -un'",
+    "ssh -o BatchMode=yes -o ConnectTimeout=8 talaris 'curl -fsS --max-time 5 http://127.0.0.1:8787/health; curl -fsS --max-time 5 http://127.0.0.1:8788/health'",
+    "ssh -o BatchMode=yes -o ConnectTimeout=8 talaris 'lsof -nP -iTCP:8787 -sTCP:LISTEN; lsof -nP -iTCP:8788 -sTCP:LISTEN'",
+    "ssh -o BatchMode=yes -o ConnectTimeout=8 talaris 'lsof -nP -iTCP -sTCP:LISTEN | awk \"NR==1 || /ssh/ || /:8787 / || /:8788 /\"'",
+    "rg -n -i 'talaris|8787|8788|hermes-w5kk|hermes-2wn4|listener|forward' ..",
+    "sed -n '1,220p' ../../../manifests/talaris-memory-ports-admission-20260715.json",
+    "rg -n 'hermes-w5kk|hermes-2wn4' /Users/hermes/.hermes/tmp/beads-backup-20260704-111234/exports/issues.jsonl /Users/hermes/.hermes/tmp/beads-backup-20260704-111234/issues.jsonl",
+    "rg -n -i 'Fix OB1 port conflict on Talaris|hermes-w5kk|hermes-2wn4' /Users/hermes/.hermes --glob '*.json' --glob '*.jsonl' --glob '*.md' --glob '*.txt' --glob '!**/sessions/**' --glob '!**/logs/**'",
+    "awk 'BEGIN{IGNORECASE=1} $1==\"Host\"||$1==\"HostName\"||$1==\"LocalForward\"||$1==\"RemoteForward\"||$1==\"DynamicForward\"||$1==\"ProxyJump\" {print NR \":\" $0}' /Users/hermes/.ssh/config",
+    "lsof -nP -iTCP -sTCP:LISTEN | awk 'NR==1 || /ssh/ || /:8787 / || /:8788 /'",
+    "rg -n -o --hidden --glob '!**/.git/**' --glob '!**/.env*' --glob '!**/*secret*' --glob '!**/*token*' '(127\\.0\\.0\\.1|localhost):878[78]' /Users/hermes/.ssh /Users/hermes/.hermes/config.yaml /Users/hermes/.hermes/profiles /Users/hermes/Library/LaunchAgents /Users/hermes/Projects/Sea Ranch AI/OB1/recipes",
+    "date -u +%Y-%m-%dT%H:%M:%SZ"
+  ],
+  "caveats": [
+    "Outbound SSH was blocked by the managed execution sandbox, so Talaris identity, health, listener ownership, forwarding processes, and active endpoint configuration were not live-observed in this run.",
+    "The canonical Beads database was not discoverable from this checkout, the global read-only lookup had no database, and localhost:3658 was unavailable. Bead titles and the hermes-2wn4 claim therefore rely on the task statement plus a secondary local reference, not a fresh canonical record read.",
+    "Aegis lsof can see OrbStack host listeners, but Docker API and ps inspection were denied by sandbox permissions. Container identity and backend state remain unverified.",
+    "Aegis health was not healthy at checked_at even though the listener sockets existed. This report does not treat listener presence as service health.",
+    "No secrets, environment values, credential files, HTTP authorization headers, or private key contents were intentionally read or reported.",
+    "observed_conflict=false means no genuine same-network-namespace collision was observed in the evidence available to this run; it is not a substitute for the blocked Talaris live pass."
+  ]
+}

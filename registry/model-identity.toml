@@ -57,3 +57,43 @@ source = "manifest model field; OpenRouter slug moonshotai/kimi-k2.7-code"
 display = "Nemotron 3 Super 120B (free)"
 confidence = "verified"
 source = "manifest model field; OpenRouter slug nvidia/nemotron-3-super-120b-a12b:free"
+
+[engines.opencode.models."github-copilot/gpt-5.6-luna"]
+display = "GPT-5.6 Luna"
+confidence = "verified"
+source = "OpenCode provider discovery on Aegis, 2026-07-12"
+
+[engines.opencode.models."github-copilot/gpt-5.6-terra"]
+display = "GPT-5.6 Terra"
+confidence = "verified"
+source = "OpenCode provider discovery on Aegis, 2026-07-12"
+
+[engines.opencode.models."github-copilot/gpt-5.6-sol"]
+display = "GPT-5.6 Sol"
+confidence = "verified"
+source = "OpenCode provider discovery on Aegis, 2026-07-12"
+
+[engines.opencode.models."ollama/qwen3.6:latest"]
+display = "Qwen 3.6 36B Local"
+confidence = "verified"
+source = "Ollama local tags on Aegis, 2026-07-12"
+
+[engines.opencode.models."ollama/devstral-small-2:latest"]
+display = "Devstral Small 2 Local"
+confidence = "verified"
+source = "Ollama local tags on Aegis, 2026-07-12"
+
+[engines.codex.models."gpt-5.6-luna"]
+display = "GPT-5.6 Luna"
+confidence = "verified"
+source = "Codex CLI eval log on Aegis, 2026-07-12"
+
+[engines.codex.models."gpt-5.6-terra"]
+display = "GPT-5.6 Terra"
+confidence = "verified"
+source = "Codex CLI eval log on Aegis, 2026-07-12"
+
+[engines.codex.models."gpt-5.6-sol"]
+display = "GPT-5.6 Sol"
+confidence = "verified"
+source = "Codex CLI eval log on Aegis, 2026-07-12"

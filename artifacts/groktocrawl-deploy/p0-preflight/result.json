@@ -1,0 +1,21 @@
+{
+  "docker": true,
+  "ports_free": true,
+  "secrets_present": {
+    "API_KEY": true,
+    "BRAVE_API_KEY": true,
+    "LLM_BASE_URL": true,
+    "LLM_MODEL": true,
+    "all_ok": true
+  },
+  "llm_local": {
+    "ok": true,
+    "model_count": 9,
+    "sample": [
+      "openhermes:7b-mistral-v2.5-q4_0",
+      "devstral-small-2:latest",
+      "qwen3.6:latest"
+    ]
+  },
+  "status": "P0_OK"
+}

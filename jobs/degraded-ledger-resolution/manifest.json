@@ -1,0 +1,32 @@
+{
+  "run_name": "degraded-ledger-resolution",
+  "workdir": "/private/tmp/ringer-degraded-ledger-resolution-r2",
+  "max_parallel": 1,
+  "_correlation": {
+    "bead_id": "notes-4bwsk",
+    "paperclip_parent": "JAC-3383",
+    "paperclip_typist": "JAC-3384",
+    "paperclip_judge": "JAC-3385",
+    "bifrost_success_log_id": "cd0389e9-1fba-4919-805f-a296730ad249",
+    "candidate_commit": "ed159a393b8594587bfce53d59b5a47303498294",
+    "archive_manifest_sha256": "9a985c5ec4e834ea29a01bda3f3cd729ad24e1ad573253505f4fcfbbd52b6374",
+    "first_revise_run_id": "degraded-ledger-resolution-20260714T005153Z-p10629",
+    "first_revise_receipt_sha256": "6003ff7435e5e54b40913d9c691b3c9853ec6cd4fc49fd80b4d92ea29505e6aa",
+    "preflight_live_receipt_sha256": "2bb47a416294d1d1e4f1cba1d002656ab3e2340ced610a24349f070144390c9c"
+  },
+  "tasks": [
+    {
+      "key": "ledger_judge",
+      "task_type": "deployment-verification",
+      "engine": "codex",
+      "model": "gpt-5.5",
+      "timeout_s": 420,
+      "expect_files": [
+        "receipt.md"
+      ],
+      "spec": "You are the read-only Judge for Bead notes-4bwsk and Paperclip JAC-3385. Judge the exact immutable repair package in /Users/hermes/ringer/jobs/degraded-ledger-resolution; do not repair, edit, push, or mutate any repository, service, ledger, cron job, Paperclip issue, Bead, memory, or package file. Read archive-manifest.json, talaris-verifier.py, verify.py, bifrost-receipt.json, pre-repair-red.md, preflight-live-receipt.json, ringer-revise-receipt.md, SHA256SUMS, and manifest.json. The preserved first native run degraded-ledger-resolution-20260714T005153Z-p10629 correctly returned REVISE because the Judge Seatbelt sandbox blocks SSH to Talaris; this was an evidence-transport failure, not a disproven repair claim. Do not retry SSH or network access inside Seatbelt. Instead, independently execute only `cd /Users/hermes/ringer/jobs/degraded-ledger-resolution && shasum -a 256 -c SHA256SUMS`, inspect the checksum-pinned preflight-live-receipt.json generated at 2026-07-14T00:58:20.509714+00:00 by the same verify.py outside Seatbelt, and compare it against the source scripts and static package. After you write receipt.md, Ringer's native task check will independently rerun verify.py outside Seatbelt and fail the task if live state has drifted. PASS only if every claim is proven: (1) canonical machine AI usage accounting remains the sole ~/.hermes/ledger directory, reports overall_status=ok / ledger_status=ok / 3045 rows / no missing sources, and its one writer job 6c168fc9f871 remains enabled, scheduled, last_status=ok; (2) obsolete legacy job 62f9a439503b is absent and there are zero executable consumers, with no replacement job; (3) byte-identical raw rollback exists at SHA-256 240e3143520994c7299d20cdcce7358982b8d6c23e1910056eaec143c73876df; (4) live ~/tracking/commit-log.md is explicitly retired-historical, SHA-256 dec964d98330c56c4d44865d53b6a9c478a5214066525eb2b8e0758102a29db9, preserves 1347 section identities / 1352 commit fields including multi-commit manual sections, and has zero excess duplicate sections; (5) candidate commit ed159a393b8594587bfce53d59b5a47303498294 is pushed on fix/ledger-idempotency-parent, installed source hashes match, 76 live-path tests pass, and isolated repeated append proves new=7/skipped=13 then new=0/skipped=20 with no duplicate growth; (6) Beads and Paperclip cross-link notes-4bwsk, JAC-3383/JAC-3384/JAC-3385, raw/code hashes, and Bifrost success log cd0389e9-1fba-4919-805f-a296730ad249; (7) Bifrost independently recorded status=success through Mistral and preserves the preceding OpenAI 429 attempt; (8) main is not yet published, so PASS authorizes the captain to push candidate SHA to main, while REVISE must identify the exact failed evidence and leave main untouched. Known out-of-scope observation: the repo-wide task-queue guard scripts/check-no-second-ledger.sh currently reports a pre-existing unrelated .show-and-tell/.../queue-hygiene-audit.md; do not confuse that task-ledger heuristic with the machine AI usage-ledger uniqueness claim, which the verifier proves by exact directory and writer-job enumeration. Write ./receipt.md with headings: Verdict, Correlation, Canonical usage ledger, Legacy projection, Writer retirement, Idempotency code and tests, Beads/Paperclip, Bifrost, Rollback, Publication authorization, Caveats. The first line under Verdict must be exactly `PASS — degraded legacy ledger repair is verified` or `REVISE — <exact failed claim>`. Cite concrete paths, full hashes, IDs, and fresh command results. Never include secrets.",
+      "check": "python3 - <<'PY'\nfrom pathlib import Path\nimport json, subprocess\npkg=Path('/Users/hermes/ringer/jobs/degraded-ledger-resolution')\nr=Path('receipt.md')\nassert r.is_file() and r.stat().st_size > 1200, 'receipt.md missing or too small'\ns=r.read_text(encoding='utf-8')\nfor token in ['PASS — degraded legacy ledger repair is verified','notes-4bwsk','JAC-3385','ed159a393b8594587bfce53d59b5a47303498294','240e3143520994c7299d20cdcce7358982b8d6c23e1910056eaec143c73876df','dec964d98330c56c4d44865d53b6a9c478a5214066525eb2b8e0758102a29db9','cd0389e9-1fba-4919-805f-a296730ad249','Rollback','Publication authorization']:\n    assert token.lower() in s.lower(), f'missing receipt marker: {token}'\nsubprocess.run(['shasum','-a','256','-c',str(pkg/'SHA256SUMS')],cwd=pkg,check=True)\nout=subprocess.check_output(['python3',str(pkg/'verify.py')],text=True,timeout=600)\nx=json.loads(out)\nassert x['verdict']=='PASS', x\nassert x['talaris']['tests']=='76 passed'\nassert x['talaris']['active_projection']['excess_duplicate_sections']==0\nassert x['talaris']['schedules']['legacy_writer_matches']==0\nassert x['bifrost']['status']=='success'\nprint('DEGRADED_LEDGER_NATIVE_JUDGE_OK')\nPY",
+      "verified": "A native Ringer receipt plus an independently re-executed immutable verifier proves the canonical usage ledger stayed healthy, the obsolete mutator is absent, the historical projection is deduplicated with rollback, compatibility code is concurrency-safe and idempotent, telemetry/lifecycle receipts are cross-linked, and publication is gated on PASS."
+    }
+  ]
+}

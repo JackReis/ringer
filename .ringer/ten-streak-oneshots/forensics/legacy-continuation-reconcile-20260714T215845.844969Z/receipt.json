@@ -1,0 +1,12 @@
+{
+  "after_status": "stopped_superseded",
+  "backup": "/Users/hermes/ringer/.ringer/ten-streak-oneshots/forensics/legacy-continuation-reconcile-20260714T215845.844969Z/continuation-state.before.json",
+  "before_status": "running",
+  "deleted": [],
+  "legacy_pid": 49609,
+  "legacy_pid_alive": false,
+  "operation": "reconcile_legacy_continuation_state",
+  "performed_at": "2026-07-14T21:58:45.844969Z",
+  "source": "/Users/hermes/ringer/.ringer/ten-streak-oneshots/continuation-state.json",
+  "verified_state": "/Users/hermes/ringer/.ringer/ten-streak-oneshots/verified-continuation-state.json"
+}

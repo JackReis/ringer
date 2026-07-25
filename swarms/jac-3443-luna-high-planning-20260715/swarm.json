@@ -1,0 +1,46 @@
+{
+  "run_name": "jac-3443-luna-high-planning-v1",
+  "workdir": "/tmp/ringer-jac-3443-luna-planning-v1",
+  "max_parallel": 1,
+  "tasks": [
+    {
+      "key": "git_salvage_sequencing",
+      "spec": "You are a planning agent. Read-only planning only. Do NOT modify any repository. Write your plan to plan-git-salvage.md in the task directory.\n\nContext: The vault at /Users/jack.reis/Documents/=notes (Talaris, accessible via SSH as 'talaris') is on branch aegis-m6-delivery, 118 behind and 9 unique commits ahead of origin/main. There are 7 unmerged local branches: aegis-m6-delivery, antigravity/main, feat/capture-honcho-bridge, fix/notes-4bwsk-ledger-idempotency, fleet-sync-20260714, release/sandy-tailnet-sot-20260713, spike/fleet-sandbox-phase0. There are 19 linked worktrees, 2 stashes, and a dirty primary checkout. Do NOT cherry-pick commit 70b9342 wholesale (it mixes Beads state, auto-stubs, scripts, plans, and unrelated artifacts). fleet-sync-20260714 is 0 behind / 2 ahead; split its commits. The Paperclip recovery pattern is likely useful; brain-agent mapping/topology is stale and must not merge wholesale.\n\nTask: Produce a detailed, ordered salvage sequencing plan for all 7 branches, 19 worktrees, 2 stashes, and dirty primary checkout. For each item: (1) classify as unique-preserve, canonical-identical, superseded-history, collision-hold, or cleanup-candidate; (2) specify the exact git commands needed to inspect and verify; (3) identify what should be cherry-picked, merged, stashed, or discarded; (4) note dependencies and ordering constraints. Include a rollback plan for each step. All artifacts salvage is HUMAN-GATED — the plan must end with an approval boundary.",
+      "check": "test -s plan-git-salvage.md && grep -q 'unique-preserve' plan-git-salvage.md && grep -q 'canonical-identical' plan-git-salvage.md && grep -q 'HUMAN-GATED' plan-git-salvage.md && grep -q 'aegis-m6-delivery' plan-git-salvage.md && grep -q 'fleet-sync-20260714' plan-git-salvage.md && grep -q 'rollback' plan-git-salvage.md && echo 'EXECUTED_CHECK=PASS git-salvage-plan-complete'",
+      "expect_files": ["plan-git-salvage.md"],
+      "engine": "codex",
+      "model": "gpt-5.6-luna",
+      "engine_args": ["-c", "model_reasoning_effort=high"],
+      "task_type": "planning",
+      "timeout_s": 600,
+      "full_access": false,
+      "verified": "Git salvage plan covers all 7 branches, includes classifications, rollback, and human-gate."
+    },
+    {
+      "key": "fleet_wave_protocol",
+      "spec": "You are a planning agent. Read-only planning only. Do NOT modify any repository. Write your plan to plan-fleet-wave.md in the task directory.\n\nContext: High-value at-risk Talaris-only files: okf/fleet/patterns/fleet-wave-protocol-v1.md and .json. Live Aegis bead hermes-9zgz confirms the wrong-Beads-store/Paperclip-projection failure they address. The Fleet Wave protocol must be audited for correctness and acceptance criteria. Paperclip recovery patterns must be validated. The issue JAC-3443 describes a required sequence: establish Luna routes (DONE), run smoke gate (DONE - PASS), then run three planning tasks (this is one of them).\n\nTask: Produce a detailed plan for: (1) Fleet Wave protocol correctness audit — what to verify in fleet-wave-protocol-v1.md and .json; (2) Paperclip recovery-pattern correctness/acceptance plan — what the recovery pattern should do, how to verify it works, and what acceptance criteria to use; (3) Integration plan — how the Fleet Wave protocol and Paperclip recovery pattern should work together with the existing Beads SSOT and Paperclip issue tracking. Include specific verification steps, test cases, and success criteria. End with an approval boundary.",
+      "check": "test -s plan-fleet-wave.md && grep -q 'fleet-wave-protocol' plan-fleet-wave.md && grep -q 'Paperclip' plan-fleet-wave.md && grep -q 'acceptance' plan-fleet-wave.md && grep -q 'verification' plan-fleet-wave.md && grep -q 'Beads' plan-fleet-wave.md && echo 'EXECUTED_CHECK=PASS fleet-wave-plan-complete'",
+      "expect_files": ["plan-fleet-wave.md"],
+      "engine": "codex",
+      "model": "gpt-5.6-luna",
+      "engine_args": ["-c", "model_reasoning_effort=high"],
+      "task_type": "planning",
+      "timeout_s": 600,
+      "full_access": false,
+      "verified": "Fleet Wave protocol plan covers correctness audit, recovery pattern, integration, and verification."
+    },
+    {
+      "key": "planned_retirement_successor",
+      "spec": "You are a planning agent. Read-only planning only. Do NOT modify any repository. Write your plan to plan-planned-retirement.md in the task directory.\n\nContext: After the rogue-artifact adjudication completes and Jack approves the salvage plan, a planned retirement and successor sweep is needed. The cold-restart plan at /Users/jack.reis/Documents/=notes/.hermes/plans/2026-07-14-cold-restart-plan-rogue-artifact-adjudication.md defines a restart order (Aegis first, then Talaris). The rogue-artifact-adjudication skill defines a repeat-to-convergence procedure. The repeat-sweep boundaries must be defined: when to stop iterating, what constitutes convergence, and how to handle items that remain unresolved.\n\nTask: Produce a detailed plan for: (1) /planned-retirement successor plan — how to retire the current rogue-artifact adjudication state and transition to a clean operational baseline; (2) Repeat-sweep boundaries — define exactly when to stop repeating the rogue-artifact discovery loop, what convergence looks like (no high/medium-loss candidates remaining or every remainder has named owner/blocker/decision path), and how to handle stragglers; (3) Post-retirement operational checklist — what to verify after the retirement is complete. Include specific criteria, timelines, and responsible parties. End with an approval boundary.",
+      "check": "test -s plan-planned-retirement.md && grep -q 'retirement' plan-planned-retirement.md && grep -q 'convergence' plan-planned-retirement.md && grep -q 'repeat-sweep' plan-planned-retirement.md && grep -q 'approval' plan-planned-retirement.md && grep -q 'operational' plan-planned-retirement.md && echo 'EXECUTED_CHECK=PASS retirement-plan-complete'",
+      "expect_files": ["plan-planned-retirement.md"],
+      "engine": "codex",
+      "model": "gpt-5.6-luna",
+      "engine_args": ["-c", "model_reasoning_effort=high"],
+      "task_type": "planning",
+      "timeout_s": 600,
+      "full_access": false,
+      "verified": "Planned retirement plan covers successor, convergence boundaries, and post-retirement checklist."
+    }
+  ]
+}

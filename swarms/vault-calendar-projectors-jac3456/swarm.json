@@ -1,0 +1,23 @@
+{
+  "run_name": "vault-calendar-projectors-jac3456-v2",
+  "workdir": "/Users/hermes/Projects/agentic-os",
+  "max_parallel": 1,
+  "tasks": [
+    {
+      "key": "verify-projector-tests",
+      "task_type": "verification",
+      "spec": "Run exactly this command and report the output: cd /Users/hermes/Projects/agentic-os/command-centre && node --no-deprecation --test src/lib/vault-projector.test.cjs 2>&1 | tail -10. Confirm the output shows '# pass 25' and '# fail 0'. Do not explore the codebase or run any other commands.",
+      "check": "cd /Users/hermes/Projects/agentic-os/command-centre && node --no-deprecation --test src/lib/vault-projector.test.cjs 2>&1 | grep -q '# pass 25' && echo PASS || echo FAIL",
+      "expect_files": [
+        "command-centre/src/lib/vault-projector.ts",
+        "command-centre/src/lib/calendar-projector.ts",
+        "command-centre/src/lib/vault-digest.ts",
+        "command-centre/src/lib/vault-projector.test.cjs"
+      ],
+      "timeout_s": 60,
+      "verified": "node --test output shows 25 pass 0 fail",
+      "paperclip_issue": "JAC-3456",
+      "bead_id": "notes-io59y.3.5"
+    }
+  ]
+}

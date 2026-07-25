@@ -1,0 +1,26 @@
+{
+  "schema_version": 3,
+  "run_name": "luna-quarantine-readback-20260716",
+  "workdir": "/private/tmp/ringer-luna-quarantine-readback-20260716",
+  "max_parallel": 1,
+  "worktrees": false,
+  "default_engine": "codex",
+  "identity": "aegis",
+  "tasks": [
+    {
+      "key": "independent-quarantine-audit",
+      "task_type": "code-review",
+      "engine": "codex",
+      "model": "gpt-5.5",
+      "engine_args": ["-c", "model_reasoning_effort=high"],
+      "timeout_s": 600,
+      "full_access": false,
+      "spec": "Act as an independent, read-only governance auditor. Do not modify Paperclip, Beads, git, services, credentials, OAuth state, Herdr, listeners, or any host configuration. Read only ../snapshot.json, a sanitized live Paperclip snapshot captured immediately before this run. Write exactly one substantive Markdown file named luna-quarantine-audit.md in your current task directory. Evaluate whether the Luna recovery quarantine is presently safe and whether it is terminally complete. Required invariants: Luna High Planner must remain provider=copilot and model=gpt-5.6-luna; JAC-3592, JAC-3593, JAC-3594, and JAC-3595 must each remain blocked, unassigned, and have executionRunId=null; stale recovery lanes JAC-3622, JAC-3608, JAC-3617, and JAC-3603 must not be able to replay openrouter or openai-codex; JAC-3626 is the active Wings-owned quarantine action and JAC-3609 is the human Copilot OAuth gate. Distinguish snapshot facts from inference. Treat any todo/in-progress stale recovery lane or active Wings run as a reason not to declare terminal completion. Include sections titled Snapshot Provenance, Invariant Matrix, Stale Lane Analysis, Active Run Analysis, Fail-Closed Decision, and Exact Next Gate. State one explicit governance verdict: SAFE_HOLD, UNSAFE, or TERMINAL_PASS. A task-level PASS means only that this audit was produced and executable checks passed; it must not be phrased as implementation authorization. Cite exact issue identifiers, statuses, assignees, executionRunId values, Luna adapter fields, and snapshot timestamps. End with READ_ONLY.",
+      "check": "set -eu; f=luna-quarantine-audit.md; if [ ! -s \"$f\" ]; then echo 'FAIL: luna-quarantine-audit.md missing or empty' >&2; exit 1; fi; for term in 'Snapshot Provenance' 'Invariant Matrix' 'Stale Lane Analysis' 'Active Run Analysis' 'Fail-Closed Decision' 'Exact Next Gate' 'SAFE_HOLD' 'READ_ONLY'; do if ! grep -Fq -- \"$term\" \"$f\"; then printf 'FAIL: audit missing required phrase: %s\\n' \"$term\" >&2; exit 1; fi; done; bytes=$(wc -c < \"$f\" | tr -d ' '); if [ \"$bytes\" -lt 3500 ]; then printf 'FAIL: audit too small: %s bytes\\n' \"$bytes\" >&2; exit 1; fi; python3 -c 'import json; d=json.load(open(\"../snapshot.json\")); by={x[\"identifier\"]:x for x in d[\"issues\"]}; a=d[\"agents\"][0]; assert a[\"adapterConfig\"][\"provider\"]==\"copilot\", \"Luna provider drift\"; assert a[\"adapterConfig\"][\"model\"]==\"gpt-5.6-luna\", \"Luna model drift\"; assert all(by[i][\"status\"]==\"blocked\" and by[i][\"assigneeAgentId\"] is None and by[i][\"executionRunId\"] is None for i in (\"JAC-3592\",\"JAC-3593\",\"JAC-3594\",\"JAC-3595\")), \"implementation quarantine invariant failed\"; assert by[\"JAC-3626\"][\"status\"]==\"in_progress\" and by[\"JAC-3626\"][\"executionRunId\"] is not None, \"expected active Wings quarantine run absent\"; assert by[\"JAC-3622\"][\"status\"]==\"todo\", \"expected stale todo lane absent\"; print(\"SNAPSHOT_CHECK=PASS exact policy preserved; implementation lanes quarantined; terminal completion correctly held\")'; printf 'EXECUTED_CHECK=PASS luna-quarantine-audit bytes=%s\\n' \"$bytes\"",
+      "expect_files": ["luna-quarantine-audit.md"],
+      "verified": "The audit proves the captured exact Luna policy and four implementation quarantine invariants while fail-closing terminal completion on the active Wings run and stale todo lane.",
+      "paperclip_issue": "JAC-3625",
+      "bead_id": "hermes-klxo.2"
+    }
+  ]
+}

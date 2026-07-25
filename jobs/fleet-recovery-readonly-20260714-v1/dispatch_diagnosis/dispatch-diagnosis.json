@@ -1,0 +1,45 @@
+{
+  "checked_at": "2026-07-14T21:51:53Z",
+  "cron_job_id": "738f3798d377",
+  "wrapper_path": "/Users/jack.reis/.hermes/scripts/beads-paperclip-dispatch.sh",
+  "script_path": "/Users/jack.reis/.hermes/scripts/beads-paperclip-dispatch.py",
+  "observed_failure": "Blocked before live Talaris diagnosis: every attempted read-only ssh talaris command failed locally with `ssh: connect to host 100.97.178.76 port 22: Operation not permitted`, so the wrapper, Python script, cron history/output, process state, and authoritative Talaris Beads were not reachable from this sandbox.",
+  "reproduction_command": "Not run against the dispatch script. A bounded 120s dry-run reproduction was intentionally skipped because the scripts could not be inspected to verify a guaranteed non-mutating mode under the read-only constraint.",
+  "reproduction_exit_or_timeout": "No dispatch reproduction exit or timeout observed. SSH connection attempts exited 255 before reaching Talaris; no 120s remote command was started.",
+  "root_cause": "Undetermined for cron 738f3798d377. The only proven blocking cause in this run is the local execution sandbox denying outbound SSH to Talaris before authentication; no evidence was available to trace an exact blocking or unbounded call inside beads-paperclip-dispatch.sh or beads-paperclip-dispatch.py without guessing.",
+  "causal_evidence": [
+    {
+      "command": "ssh talaris \"stat -f '%N %Sm %z bytes' /Users/jack.reis/.hermes/scripts/beads-paperclip-dispatch.sh /Users/jack.reis/.hermes/scripts/beads-paperclip-dispatch.py\"",
+      "result": "exit 255; stderr: ssh: connect to host 100.97.178.76 port 22: Operation not permitted"
+    },
+    {
+      "command": "ssh talaris \"sed -n '1,260p' /Users/jack.reis/.hermes/scripts/beads-paperclip-dispatch.sh\"",
+      "result": "exit 255; stderr: ssh: connect to host 100.97.178.76 port 22: Operation not permitted"
+    },
+    {
+      "command": "ssh talaris \"sed -n '1,320p' /Users/jack.reis/.hermes/scripts/beads-paperclip-dispatch.py\"",
+      "result": "exit 255; stderr: ssh: connect to host 100.97.178.76 port 22: Operation not permitted"
+    },
+    {
+      "command": "ssh talaris \"crontab -l\"",
+      "result": "exit 255; stderr: ssh: connect to host 100.97.178.76 port 22: Operation not permitted"
+    },
+    {
+      "command": "ssh -G talaris | sed -n '1,80p'",
+      "result": "local config resolved talaris to user jack.reis, hostname 100.97.178.76, port 22, identitiesonly yes; this confirms the alias resolution path but does not reach Talaris"
+    },
+    {
+      "command": "rg -n \"738f3798d377|beads-paperclip-dispatch|authoritative Talaris Beads|120s|cron|Paperclip|PaperClip|dispatch\" /Users/hermes/ringer/jobs/fleet-recovery-readonly-20260714-v1",
+      "result": "no local copied dispatch script, cron output, or 738f3798d377 evidence was found outside this worker transcript; sibling beads-authority.json independently reported the same ssh Operation not permitted blocker for authoritative Talaris Beads"
+    }
+  ],
+  "red_command": "ssh talaris \"stat -f '%N %Sm %z bytes' /Users/jack.reis/.hermes/scripts/beads-paperclip-dispatch.sh /Users/jack.reis/.hermes/scripts/beads-paperclip-dispatch.py\"",
+  "green_condition": "From a runner allowed to reach ssh talaris, the read-only inspection of wrapper, Python script, cron history/output, and process state succeeds; only after confirming a non-mutating mode, a bounded 120s dry run identifies the exact blocking or unbounded call for cron 738f3798d377.",
+  "minimal_fix": "Re-run this diagnosis from an environment with outbound SSH permission to Talaris, keeping the same read-only commands first. Do not edit scripts, cron jobs, Beads, or Paperclip until live evidence identifies the dispatch-level root cause.",
+  "risks": [
+    "A cron/script root cause is not established; treating this as the Beads-to-Paperclip failure would be a guess.",
+    "No cron history/output or process state was readable from Talaris in this sandbox.",
+    "No dry-run contract was verified in the scripts, so running the dispatch path could mutate Beads or Paperclip."
+  ],
+  "confidence": "High that the local diagnosis was blocked by sandboxed SSH egress; low for any cron-level root cause because Talaris evidence was unreachable."
+}

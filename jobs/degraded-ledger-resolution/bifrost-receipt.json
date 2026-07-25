@@ -1,0 +1,33 @@
+{
+  "deployment_id": "degraded-ledger-resolution-20260714",
+  "purpose": "independent repair risk review",
+  "bead": "notes-4bwsk",
+  "paperclip_parent": "JAC-3383",
+  "attempts": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.5",
+      "bifrost_log_id": "e650aebf-ec0b-43b7-8ae5-7b6fad7d2dc3",
+      "status": "error",
+      "http_status": 429,
+      "error_type": "insufficient_quota",
+      "timestamp": "2026-07-14T00:29:03.978466Z"
+    },
+    {
+      "correlation": "degraded-ledger-resolution-20260714-mistral",
+      "provider": "mistral",
+      "model": "mistral-small-latest",
+      "response_id": "8d4dc001f1784b1382b89a92779238e5",
+      "bifrost_log_id": "cd0389e9-1fba-4919-805f-a296730ad249",
+      "status": "success",
+      "timestamp": "2026-07-14T00:29:23.450607Z",
+      "latency_ms": 623,
+      "cost": 0.0001955,
+      "prompt_tokens": 1856,
+      "completion_tokens": 33,
+      "total_tokens": 1889,
+      "verdict": "SOUND",
+      "risk": "Validate native Ringer manifest integrity and cross-link accuracy with Paperclip/Beads before final cutover."
+    }
+  ]
+}

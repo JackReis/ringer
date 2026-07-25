@@ -1,0 +1,211 @@
+{
+  "checked_at": "2026-07-14T21:59:31Z",
+  "worktree": {
+    "requested_path": "/Users/hermes/Projects/Sea Ranch AI/.paperclip/worktrees/JAC-3440-fix-sally-need-canonical-directions-to-sea-ranch-based-on-real-maps-with-deference-to-realtime",
+    "branch": "JAC-3440-fix-sally-need-canonical-directions-to-sea-ranch-based-on-real-maps-with-deference-to-realtime",
+    "head": "7fedb5decd98eca9d5bce630c1f09f0a6694f187",
+    "status": "clean",
+    "tracked_files": 0,
+    "finding": "The requested clean JAC-3440 worktree exists but contains only its .git file. It does not contain directGroundedAnswer(), directions handlers, guest-resources corpus entries, source URLs, or frontend starter queries.",
+    "read_only_source_context": {
+      "path": "/Users/hermes/Projects/Sea Ranch AI/sally-hybrid",
+      "branch": "main",
+      "head": "82f4218fcf5c22ee2d3a69a2ad57b564d1eb3d9b",
+      "status_before_inspection": "modified: src/index.js",
+      "handler_file": "/Users/hermes/Projects/Sea Ranch AI/sally-hybrid/src/index.js",
+      "corpus_file": "/Users/hermes/Projects/Sea Ranch AI/sally-hybrid/src/guest-resources-corpus.js",
+      "source_snapshot_file": "/Users/hermes/Projects/Sea Ranch AI/sally-hybrid/data/guest-resources-source.json",
+      "inspection_mode": "read-only; no source edits or commits"
+    }
+  },
+  "production_url": "https://sally.oursearanchhome.com",
+  "current_behavior": [
+    {
+      "query": "GET https://sally.oursearanchhome.com/health",
+      "live_probe": "blocked before HTTP in this runner",
+      "response_summary": "No live production response body was captured. Local curl and Python urllib both failed DNS resolution for sally.oursearanchhome.com with 'Could not resolve host' / 'nodename nor servname provided, or not known'.",
+      "verification_impact": "The user-supplied verifier requires live.status == ok from this URL, so it cannot pass from this runner while DNS/network access to sally.oursearanchhome.com is blocked."
+    },
+    {
+      "query": "How do I get there?",
+      "live_probe": "blocked before HTTP in this runner",
+      "local_source_probe": "With a read-only allow-all SALLY_RATE_LIMITER stub, /sally/chat returned HTTP 200, source guest-resources-safety-handoff, and cited https://guest-resources.oursearanchhome.com/your-stay/getting-here.",
+      "response_summary": "No live production chat response was captured. The inspected current handler matches directGroundedAnswer() and returns a guest-resources-safety-handoff answer citing Getting Here. The source-level response includes the destination address, broad San Francisco/Santa Rosa/north route prose, final approach, and real-time navigation deference.",
+      "source_reference": "/Users/hermes/Projects/Sea Ranch AI/sally-hybrid/src/index.js:489"
+    },
+    {
+      "query": "Can you route me around road closures?",
+      "live_probe": "blocked before HTTP in this runner",
+      "local_source_probe": "With a read-only allow-all SALLY_RATE_LIMITER stub, /sally/chat returned HTTP 200, source guest-resources-safety-handoff, and cited https://guest-resources.oursearanchhome.com/your-stay/getting-here.",
+      "response_summary": "No live production chat response was captured. The inspected current handler matches the directions/road conditions branch. The source-level response starts with the same broad directions answer and should be tightened so road closure questions foreground CHP, Caltrans/DOT, Sonoma County Road Closures and Delays, and live navigation tools rather than implying Sally can route around closures.",
+      "source_reference": "/Users/hermes/Projects/Sea Ranch AI/sally-hybrid/src/index.js:489"
+    },
+    {
+      "query": "What is the weather like for the drive?",
+      "live_probe": "blocked before HTTP in this runner",
+      "local_source_probe": "With a read-only allow-all SALLY_RATE_LIMITER stub, /sally/chat returned HTTP 200, source concierge-note, no sources array entries, and static Sea Ranch climate text.",
+      "response_summary": "No live production chat response was captured. The inspected source does not show a dedicated directGroundedAnswer() weather-travel safety branch. The source-level response for this query is static concierge-note climate content, so weather-sensitive travel decisions still need explicit deference to current weather and road authorities.",
+      "source_reference": "/Users/hermes/Projects/Sea Ranch AI/sally-hybrid/src/index.js:218"
+    },
+    {
+      "query": "What should I do if there is an evacuation?",
+      "live_probe": "blocked before HTTP in this runner",
+      "local_source_probe": "With a read-only allow-all SALLY_RATE_LIMITER stub, /sally/chat returned HTTP 200, source safety-handoff, and cited https://guest-resources.oursearanchhome.com/your-stay/survival-guide.",
+      "response_summary": "No live production chat response was captured. The inspected current handler matches directGroundedAnswer() and returns a safety-handoff answer citing Survival Guide, says evacuation guests should go to Ohlson Ranch House, tells users to call 911 for immediate emergency, and says not to rely on Sally for live routing.",
+      "source_reference": "/Users/hermes/Projects/Sea Ranch AI/sally-hybrid/src/index.js:424"
+    }
+  ],
+  "canonical_sources": [
+    {
+      "title": "Vista Del Mar Guest Resources - Getting Here",
+      "url": "https://guest-resources.oursearanchhome.com/your-stay/getting-here"
+    },
+    {
+      "title": "Vista Del Mar Google Map",
+      "url": "https://goo.gl/maps/gC633myCM262"
+    },
+    {
+      "title": "California Highway Patrol Traffic Incident Information",
+      "url": "http://cad.chp.ca.gov"
+    },
+    {
+      "title": "California Department of Transportation Road Information",
+      "url": "https://roads.dot.ca.gov/"
+    },
+    {
+      "title": "Sonoma County Road Closures and Delays",
+      "url": "https://roadclosures-sonomacounty.hub.arcgis.com/"
+    },
+    {
+      "title": "Vista Del Mar Guest Resources - Checking Out",
+      "url": "https://guest-resources.oursearanchhome.com/your-stay/checking-out"
+    },
+    {
+      "title": "Vista Del Mar Guest Resources - Survival Guide",
+      "url": "https://guest-resources.oursearanchhome.com/your-stay/survival-guide"
+    },
+    {
+      "title": "The Sea Ranch Association Emergencies",
+      "url": "https://www.tsra.org/emergencies/"
+    },
+    {
+      "title": "PG&E Storms, Outages, and Safety",
+      "url": "https://www.pge.com/en_US/safety/emergency-preparedness/natural-disaster/storms/storms.page"
+    },
+    {
+      "title": "KGUA 88.3FM Gualala",
+      "url": "https://kgua.org/"
+    }
+  ],
+  "route_facts": [
+    {
+      "fact": "The canonical destination address in Guest Resources is 37691 Breaker Reach, Sea Ranch, CA 95497.",
+      "source_url": "https://guest-resources.oursearanchhome.com/your-stay/getting-here"
+    },
+    {
+      "fact": "Guest Resources links a Google Map for Vista Del Mar.",
+      "source_url": "https://goo.gl/maps/gC633myCM262"
+    },
+    {
+      "fact": "At mile marker SOM 54.41 on Highway 1, turn left onto Vantage Road, then left on Breaker Reach, continue to the end of the cul-de-sac, and the home is the first home on the right side of the cul-de-sac.",
+      "source_url": "https://guest-resources.oursearanchhome.com/your-stay/getting-here"
+    },
+    {
+      "fact": "Before departure, Guest Resources says to check for delays or detours.",
+      "source_url": "https://guest-resources.oursearanchhome.com/your-stay/getting-here"
+    },
+    {
+      "fact": "CHP Traffic Incident Information is described as the most up-to-the-minute source for roads patrolled by CHP, including incidents such as a tree across Highway 1 at Sea Ranch.",
+      "source_url": "http://cad.chp.ca.gov"
+    },
+    {
+      "fact": "Caltrans/DOT Road Information is described as the definitive source for medium- and long-term status information for numbered California highways such as US 101 and CA 1.",
+      "source_url": "https://roads.dot.ca.gov/"
+    },
+    {
+      "fact": "Sonoma County Road Closures and Delays is described as the source for unnumbered roads in Sonoma County, for example River Road flooding.",
+      "source_url": "https://roadclosures-sonomacounty.hub.arcgis.com/"
+    },
+    {
+      "fact": "Guest Resources says a complete picture generally requires checking the CHP site and either the DOT and/or Sonoma County site as appropriate, and that Google Maps is often up-to-date for closed roads.",
+      "source_url": "https://guest-resources.oursearanchhome.com/your-stay/getting-here"
+    },
+    {
+      "fact": "Because cell phones can be iffy in mobile dead spots or weak-network areas, Guest Resources encourages guests to print and carry the directions.",
+      "source_url": "https://guest-resources.oursearanchhome.com/your-stay/getting-here"
+    },
+    {
+      "fact": "Checking Out tells guests to check route delays, detours, and road closures while they still have internet access.",
+      "source_url": "https://guest-resources.oursearanchhome.com/your-stay/checking-out"
+    }
+  ],
+  "realtime_deference": [
+    {
+      "topic": "live navigation",
+      "required_deference": "Sally must not provide live or turn-by-turn navigation. It should hand off to Google Maps, Apple Maps, Waze, or another live navigation provider for real-time routing to 37691 Breaker Reach.",
+      "source_url": "https://guest-resources.oursearanchhome.com/your-stay/getting-here"
+    },
+    {
+      "topic": "road closures",
+      "required_deference": "Sally must not claim current road closure, road closures, delays, or detours. It should direct guests to CHP for up-to-the-minute incidents, Caltrans/DOT for numbered highways including CA 1 and US 101, and Sonoma County for local unnumbered roads.",
+      "source_url": "https://guest-resources.oursearanchhome.com/your-stay/getting-here"
+    },
+    {
+      "topic": "weather",
+      "required_deference": "Sally must not provide a weather forecast or infer current travel safety from static Guest Resources. For severe weather, storms, power outages, mudslides, or trees blocking roadways, it should defer to current weather, utility, public-agency, and road authorities; Sally is not a weather service.",
+      "source_url": "https://guest-resources.oursearanchhome.com/your-stay/survival-guide"
+    },
+    {
+      "topic": "official/local emergency guidance",
+      "required_deference": "For evacuation, wildfire, tsunami, earthquake, medical, police, or immediate emergency guidance, Sally should tell guests to call 911 when immediate, follow public authorities and local emergency instructions, and use Survival Guide contacts such as Sea Ranch Fire Department, Sonoma County Sheriff, CHP, The Sea Ranch Association emergency resources, and KGUA.",
+      "source_url": "https://guest-resources.oursearanchhome.com/your-stay/survival-guide"
+    }
+  ],
+  "exact_queries_to_test": [
+    "How do I get there?",
+    "How can I get to the house?",
+    "How do I drive to Vista Del Mar from Santa Rosa?",
+    "What is the address?",
+    "Where is The Sea Ranch?",
+    "Can you route me around road closures?",
+    "Are there road closures on Highway 1?",
+    "What is the weather like for the drive?",
+    "What should I do if there is an evacuation?",
+    "frontend starter sally: What's there to do nearby?",
+    "frontend starter sally: Where should we eat around here?",
+    "frontend starter sally: Tell me about the kitchen",
+    "frontend starter bill: What's there to do nearby?",
+    "frontend starter bill: Where do locals actually eat around here?",
+    "frontend starter bill: Tell me about the kitchen"
+  ],
+  "required_handler_patterns": [
+    "directGroundedAnswer(query) must run before extractive guest-resources search for directions, address, route, road condition, road closure, Santa Rosa, STS, airport, arrival, and evacuation phrasing.",
+    "The directions handler must cite https://guest-resources.oursearanchhome.com/your-stay/getting-here via sourceUrls, and /sally/sources must return query_type guest-resources-direct for matched directions queries.",
+    "The directions answer should include only source-grounded route facts unless new canonical source text is added; current source-grounded facts cover the address, Highway 1 mile marker SOM 54.41, Vantage Road, Breaker Reach, cul-de-sac, and official road-status sources.",
+    "The answer must include real-time deference: no live navigation, no turn-by-turn routing, no current road closure or road closures status, and no weather forecast.",
+    "The road-conditions language must direct users to CHP, Caltrans/DOT, and Sonoma County Road Closures and Delays rather than inventing detours.",
+    "The evacuation handler must remain safety-handoff, cite Survival Guide, mention Ohlson Ranch House only as sourced, and defer live routing and official emergency instructions to 911/public authorities.",
+    "GET /sally/config should continue to expose answer_policy guest-resources-only and live_navigation_enabled false.",
+    "Frontend sendText must call /sally/sources and /sally/chat on window.location.origin; current exact frontend starter queries are Things to do, Dining, and Around the house for Sally/Bill, with no directions starter currently present."
+  ],
+  "regression_assertions": [
+    "POST /sally/chat with 'How do I get there?' returns an answer with source 'guest-resources-safety-handoff' or an equivalent direct source, cites Getting Here, includes 37691 Breaker Reach, and includes real-time navigation deference.",
+    "POST /sally/sources with 'How do I get there?' returns query_type 'guest-resources-direct' and includes https://guest-resources.oursearanchhome.com/your-stay/getting-here.",
+    "POST /sally/chat with 'Can you route me around road closures?' must not invent a detour or claim current road closure status; it must cite or direct users to CHP, Caltrans, and Sonoma County Road Closures and Delays.",
+    "POST /sally/chat with 'What is the weather like for the drive?' must not provide a forecast from static Guest Resources; it must defer weather-sensitive travel decisions to current weather/road authorities and mention Sally is not a weather service.",
+    "POST /sally/chat with 'What should I do if there is an evacuation?' must cite Survival Guide, mention Ohlson Ranch House only as sourced, tell users to call 911 for immediate emergencies, and defer live routing to official/local emergency guidance.",
+    "The response must not include unsupported San Francisco, Bay Area, River Road/Guerneville, Jenner, Mendocino, or Fort Bragg step-by-step directions unless those exact route steps are added to canonical Guest Resources or another approved source URL.",
+    "GET /sally/config returns live_navigation_enabled false and answer_policy guest-resources-only.",
+    "The frontend starter queries remain exactly: Sally: 'What's there to do nearby?', 'Where should we eat around here?', 'Tell me about the kitchen'; Bill: 'What's there to do nearby?', 'Where do locals actually eat around here?', 'Tell me about the kitchen'. If adding a directions starter, its q value should be exactly 'How do I get there?'."
+  ],
+  "risks": [
+    "The requested JAC-3440 worktree is clean but empty, so it cannot itself prove directGroundedAnswer(), current directions handlers, guest-resources corpus entries, source URLs, or exact frontend starter queries.",
+    "The only current handler evidence found is in /Users/hermes/Projects/Sea Ranch AI/sally-hybrid, and that tree already had an uncommitted src/index.js modification before this evidence pass.",
+    "Production at sally.oursearanchhome.com could not be reached from this runner: curl and Python urllib both failed DNS resolution before HTTP, so current live query/response behavior remains unverified here.",
+    "The user-supplied verification command cannot pass in this runner while https://sally.oursearanchhome.com/health is unreachable by DNS, regardless of JSON content.",
+    "The inspected current directGroundedAnswer() directions answer includes San Francisco/Bay Area, Santa Rosa/River Road/Jenner, and north/Mendocino/Fort Bragg route steps that were not found in the inspected Guest Resources Getting Here corpus entry.",
+    "Weather handling is not currently a dedicated directGroundedAnswer() path; the source-level probe for 'What is the weather like for the drive?' returned static concierge-note climate content with no sources array entries, so a weather travel query needs a clearer source-limited handoff.",
+    "The Checking Out corpus link for route delays, detours, and road closures is a malformed combined URL; prefer the Getting Here CHP, Caltrans/DOT, and Sonoma County source URLs."
+  ],
+  "recommendation": "Do not infer a route from memory. Recreate the directions fix in a non-empty, correct Sally worktree or reconcile JAC-3440 with sally-hybrid, then restrict directGroundedAnswer() to the source-grounded Getting Here facts unless additional canonical route-source text is added. Keep explicit real-time deference for live navigation, road closures, weather, and official/local emergency guidance. Add regression tests for /sally/chat, /sally/sources, /sally/config, and frontend starter queries. Verify sally.oursearanchhome.com production from a network path that can resolve https://sally.oursearanchhome.com/health before claiming live production behavior."
+}

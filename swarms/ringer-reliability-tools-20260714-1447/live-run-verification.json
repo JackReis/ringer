@@ -1,0 +1,67 @@
+{
+  "errors": [],
+  "per_task": [
+    {
+      "attempts": 1,
+      "deliverables_declared": 2,
+      "deliverables_missing": 0,
+      "eval_matches": 1,
+      "key": "clean-streak-auditor",
+      "latest_eval_executed_check": true,
+      "latest_eval_line": 247,
+      "latest_eval_pass": true,
+      "retries": 0,
+      "state_check_returncode": 0,
+      "state_check_timed_out": false,
+      "state_status_pass": true,
+      "state_verdict_pass": true,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "deliverables_declared": 2,
+      "deliverables_missing": 0,
+      "eval_matches": 1,
+      "key": "manifest-policy-checker",
+      "latest_eval_executed_check": true,
+      "latest_eval_line": 242,
+      "latest_eval_pass": true,
+      "retries": 0,
+      "state_check_returncode": 0,
+      "state_check_timed_out": false,
+      "state_status_pass": true,
+      "state_verdict_pass": true,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "deliverables_declared": 2,
+      "deliverables_missing": 0,
+      "eval_matches": 1,
+      "key": "run-evidence-verifier",
+      "latest_eval_executed_check": true,
+      "latest_eval_line": 252,
+      "latest_eval_pass": true,
+      "retries": 0,
+      "state_check_returncode": 0,
+      "state_check_timed_out": false,
+      "state_status_pass": true,
+      "state_verdict_pass": true,
+      "valid": true
+    }
+  ],
+  "run_id": "ringer-reliability-tools-20260714-1447-20260714T195347Z-p58930",
+  "schema_version": "1.0",
+  "summary": {
+    "deliverables_checked": true,
+    "deliverables_missing": 0,
+    "deliverables_total": 6,
+    "eval_matching_rows_total": 3,
+    "eval_rows_total": 3,
+    "retries_total": 0,
+    "state_summary_fail": 0,
+    "tasks_total": 3
+  },
+  "valid": true,
+  "warnings": []
+}

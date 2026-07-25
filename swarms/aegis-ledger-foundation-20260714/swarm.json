@@ -1,0 +1,34 @@
+{
+  "run_name": "aegis-ledger-foundation-20260714",
+  "workdir": "/Users/hermes/ringer/swarms/aegis-ledger-foundation-20260714/work",
+  "max_parallel": 2,
+  "identity": "aegis",
+  "tasks": [
+    {
+      "key": "provider-health-probe",
+      "task_type": "code-feature",
+      "engine": "codex",
+      "timeout_s": 420,
+      "expect_files": [
+        "provider_health_probe.py",
+        "test_provider_health_probe.py"
+      ],
+      "spec": "Implement a production-quality, stdlib-only Python 3 provider health probe in the current task directory. Do not inspect or modify anything outside this directory. Do not call live provider APIs or read credentials. Start implementation immediately.\n\nCreate provider_health_probe.py with a CLI: --config PATH --output PATH. The config is JSON with a providers array. Each provider has name, url, method (GET or POST), timeout_s, and optional JSON body. Reject config headers whose names imply credentials (authorization, api-key, x-api-key) so no secrets can enter artifacts. Probe each URL using urllib.request. Classify status exactly as: up for HTTP 2xx; rate-limited for HTTP 429; down for every other HTTP response, URL/network error, timeout, or malformed configuration. Record provider, status, http_status (integer or null), latency_ms (nonnegative integer), timestamp (UTC ISO-8601), and a sanitized error category that never contains response bodies, URLs, headers, exception strings, or credentials. Write one atomic JSON result containing generated_at and providers; create output parent directories. Return exit 0 only when every provider is up; otherwise return exit 1. Use deterministic ordering matching config order.\n\nCreate test_provider_health_probe.py using unittest and a local ThreadingHTTPServer only. Cover: 200=>up/exit0, 429=>rate-limited/exit1, 500=>down, unreachable endpoint=>down without leaked URL, malformed config=>clean nonzero error, credential-like header rejection, deterministic order, atomic output creation, and output containing no fixture secret marker. Tests must invoke the CLI as a subprocess as well as exercise core functions. Include type hints and concise docstrings. Do not create any files beyond the two expected files and test temporaries.",
+      "check": "set -eu; /Users/hermes/homebrew/bin/python3 -m unittest -v test_provider_health_probe.py; /Users/hermes/homebrew/bin/python3 -m py_compile provider_health_probe.py test_provider_health_probe.py; /Users/hermes/homebrew/bin/python3 - <<'PY'\nfrom pathlib import Path\nfor name in ('provider_health_probe.py','test_provider_health_probe.py'):\n p=Path(name); assert p.is_file() and p.stat().st_size > 500, f'FAIL: {name} missing or trivial'\ntext=Path('provider_health_probe.py').read_text() + Path('test_provider_health_probe.py').read_text()\nassert 'SECRET_FIXTURE_MARKER' not in text, 'FAIL: secret fixture marker retained in source'\nprint('PASS: provider probe compiles and its isolated HTTP/error/security test suite passes.')\nPY",
+      "verified": "The stdlib provider probe compiles and passes isolated executable tests for HTTP classification, sanitization, credential rejection, deterministic ordering, atomic output, and exit semantics."
+    },
+    {
+      "key": "token-usage-aggregation",
+      "task_type": "data-pipeline",
+      "engine": "codex",
+      "timeout_s": 420,
+      "expect_files": [
+        "aggregate_token_usage.py",
+        "test_aggregate_token_usage.py"
+      ],
+      "spec": "Implement a production-quality, stdlib-only Python 3 token-usage aggregator in the current task directory. Do not inspect or modify anything outside this directory. Do not open the live ~/.hermes/state.db. Start implementation immediately.\n\nCreate aggregate_token_usage.py with CLI: --db PATH --out-24h PATH --out-month PATH and optional --now ISO_UTC for deterministic tests. Open SQLite read-only. Read the sessions table columns: id, model, started_at (Unix epoch seconds), input_tokens, output_tokens, billing_provider, estimated_cost_usd. Aggregate two windows: rolling 24 hours ending at now, and current UTC calendar month through now. Skip rows where input_tokens, output_tokens, and estimated_cost_usd are all zero/null. Normalize blank/null billing_provider to unknown and blank/null model to unknown. For each window output exactly: window, providers, generated_at. Each provider has total_input_tokens, total_output_tokens, total_estimated_cost_usd, session_count, and models; each model has input, output, cost. Ensure deterministic lexicographic provider/model ordering, integer token totals, rounded six-decimal costs, and atomic JSON writes with parent directory creation. session_count counts included session rows once per provider. Fail cleanly and nonzero for missing DB, missing sessions table, or incompatible schema; never emit SQL row contents in errors.\n\nCreate test_aggregate_token_usage.py using unittest and temporary SQLite fixtures only. Cover exact 24h boundary, exclusion just outside boundary, month boundary, multiple providers/models, null normalization, zero-row skipping, cost rounding, deterministic ordering, read-only source DB behavior, atomic nested output creation, missing DB, missing table, and incompatible schema. Tests must invoke the CLI via subprocess and validate exact output objects. Include type hints and concise docstrings. Do not create files beyond the two expected files and test temporaries.",
+      "check": "set -eu; /Users/hermes/homebrew/bin/python3 -m unittest -v test_aggregate_token_usage.py; /Users/hermes/homebrew/bin/python3 -m py_compile aggregate_token_usage.py test_aggregate_token_usage.py; /Users/hermes/homebrew/bin/python3 - <<'PY'\nfrom pathlib import Path\nfor name in ('aggregate_token_usage.py','test_aggregate_token_usage.py'):\n p=Path(name); assert p.is_file() and p.stat().st_size > 500, f'FAIL: {name} missing or trivial'\ntext=Path('aggregate_token_usage.py').read_text()\nfor field in ('billing_provider','estimated_cost_usd','started_at','out-24h','out-month'):\n assert field in text, f'FAIL: required contract token absent: {field}'\nprint('PASS: token aggregation pipeline compiles and its isolated SQLite boundary/schema/output test suite passes.')\nPY",
+      "verified": "The token aggregation pipeline compiles and passes executable SQLite fixture tests for time windows, provider/model totals, schema failures, read-only access, deterministic output, and atomic writes."
+    }
+  ]
+}

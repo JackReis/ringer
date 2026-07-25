@@ -1,0 +1,33 @@
+{
+  "run_name": "clean-my-ai-harness-import-preflight-20260723",
+  "workdir": "/Users/hermes/.ringer/work/clean-my-ai-harness-import-preflight-20260723",
+  "max_parallel": 1,
+  "risk": "low",
+  "orchestrator": {
+    "provider": "openai",
+    "model": "gpt-5.5",
+    "family": "gpt-5",
+    "runtime": "heyclicky-codex-aegis",
+    "attestation": "User explicitly requested Ringer, Paperclip, and the configured Kimi subscription for an additive artifact import on 2026-07-23"
+  },
+  "tasks": [
+    {
+      "key": "kimi-clean-harness-import-preflight",
+      "task_type": "read-only-coherence-audit",
+      "paperclip_issue": "e036416a-5453-402a-bbce-e2a3a02bc305",
+      "bead_id": "hermes-f5bl",
+      "engine": "kimi",
+      "model": "kimi-for-coding/k2p7",
+      "full_access": false,
+      "timeout_s": 900,
+      "expect_files": [
+        "integration-plan.md",
+        "verification.json",
+        "receipt.md"
+      ],
+      "verified": "Kimi inspected only the declared source and index files, produced a no-write receipt, and confirmed every preflight safety boolean before integration.",
+      "check": "python3 - <<'PY'\nimport json\nfrom pathlib import Path\nrequired=[Path('integration-plan.md'),Path('verification.json'),Path('receipt.md')]\nmissing=[str(p) for p in required if not p.exists() or p.stat().st_size==0]\nif missing: raise SystemExit('missing required outputs: '+repr(missing))\nv=json.loads(Path('verification.json').read_text())\nfor key in ['source_hashes_present','target_paths_unclaimed','gallery_targets_clean','knowledge_graph_targets_clean','secrets_excluded','safe_to_integrate']:\n if v.get(key) is not True: raise SystemExit('verification failed: '+key+'='+repr(v.get(key)))\ntext=Path('receipt.md').read_text()\nif 'no-production-writes' not in text.lower(): raise SystemExit('receipt lacks no-production-writes attestation')\nprint('PASS: Kimi preflight outputs complete and safe_to_integrate=true')\nPY",
+      "spec": "Perform a bounded, read-only preflight for Beads issue hermes-f5bl. The user wants the recovered Clean My AI Harness guide synthesis and related Claude session deliverables integrated into Agentic OS and its knowledge graph. Aegis is the canonical repo writer for this run; Talaris must not be modified by this task. Do not print, read, copy, or persist secrets, environment files, credentials, tokens, or key material. Do not modify production files, git state, Beads, Paperclip, services, or vaults.\n\nInspect only these inputs:\n- /Users/hermes/.ringer/work/clean-my-ai-harness-import-preflight-20260723/source/source-manifest.json\n- /Users/hermes/.ringer/work/clean-my-ai-harness-import-preflight-20260723/source/clean-my-ai-harness-guide-synthesis.html\n- /Users/hermes/.ringer/work/clean-my-ai-harness-import-preflight-20260723/source/your-ai-setup.html\n- /Users/hermes/.ringer/work/clean-my-ai-harness-import-preflight-20260723/source/claudemd-currentness-audit.md\n- /Users/hermes/.ringer/work/clean-my-ai-harness-import-preflight-20260723/source/fleet-org-chart.html\n- /Users/hermes/Projects/agentic-os/AGENTS.md\n- /Users/hermes/Projects/agentic-os/artifacts/gallery/index.html\n- /Users/hermes/Projects/agentic-os/artifacts/gallery/knowledge-graph/fleet-data.json\n- /Users/hermes/Projects/agentic-os/artifacts/gallery/knowledge-graph/index.html\n- /Users/hermes/Projects/agentic-os/artifacts/surface-manifest.json\n- git status limited to those target paths.\n\nProduce integration-plan.md with exact additive destination paths, the smallest safe index changes, duplicate/conflict checks, and validation commands. Explicitly identify whether the related fleet-org-chart should be copied or only referenced. Produce verification.json with booleans for source_hashes_present, target_paths_unclaimed, gallery_targets_clean, knowledge_graph_targets_clean, secrets_excluded, and safe_to_integrate plus a concise reasons array. Produce receipt.md with the model/route, files inspected, and a no-production-writes attestation. Keep all outputs in the Ringer workdir."
+    }
+  ]
+}

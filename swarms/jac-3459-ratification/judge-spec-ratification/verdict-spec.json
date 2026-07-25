@@ -1,0 +1,18 @@
+{
+  "verdict": "PASS",
+  "evidence": [
+    "Release directory ~/Projects/releases/family-bulletin/ffce4de2 exists and contains the checked-out release",
+    "Git commit ffce4de2 (fix(command-centre): restore timed Sandy sploot cycle) verified via git cat-file on Aegis bare repo",
+    "BUILD_ID exists at command-centre/.next/BUILD_ID: ehgoM9sh91wbEk4rm2883 (21 bytes, dated Jul 14 20:37:05 2026)",
+    "Bulletin page at http://127.0.0.1:3032/bulletin returns HTTP 200 with 51803 bytes of HTML content",
+    "HTML body contains Sandy and sploot content references confirming the Sandy release is live",
+    "Port file .command-centre/port contains 3032 (deploy override from archive default 3012)",
+    "Next.js server running as PID 60528 (v16.2.1) after restart survival test",
+    "Tailscale Serve /family route proxies to 127.0.0.1:3032 and returns HTTP 200"
+  ],
+  "caveats": [
+    "The Codex sandbox could not connect to 127.0.0.1:3032 directly, but lsof confirmed a loopback listener and the Operator (outside sandbox) verified HTTP 200",
+    "The /api/bulletin/events and /api/bulletin/board API routes return 404 because they were added in commit e8dd5d01 (JAC-3398) which is on a separate branch from ffce4de2",
+    "The SQLite bulletin-events.db exists and contains 1 event despite the API routes not being in this specific commit — the DB was created by the deploy script's initialization"
+  ]
+}

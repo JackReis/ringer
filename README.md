@@ -104,6 +104,10 @@ Each task gets its own directory, its own worker, its own log, and its own verdi
 | `verified` | One plain-English sentence saying what the check proves — shown on the results page next to "finished & checked" |
 | `full_access` | Worker runs unsandboxed — required for workers that spawn their own sub-workers; must also be enabled in config |
 | `worktrees` (run-level) | Give each task an isolated git worktree of `repo` so parallel workers can't collide |
+| `paperclip_issue` | Paperclip issue ID — auto-projected to issue comments by `paperclip_projector.py` post-run hook |
+| `bead_id` | Beads issue ID — auto-projected to Beads comments by `paperclip_projector.py` post-run hook |
+| `routine_id` | Paperclip Routine UUID — links this Ringer run to a Paperclip Routine definition; verdict posted to the routine's active issue |
+| `goal_id` | Paperclip Goal UUID — links this Ringer run to a Paperclip Goal; progress comment posted to the goal's most recent in-progress issue |
 
 > **Worktree footgun:** on PASS the task's worktree is removed — including anything written inside it. In worktrees mode, worker logs live outside task worktrees in `workdir/logs/`; have workers write deliverables outside the worktree too, or have your `check` copy artifacts out before it exits 0.
 

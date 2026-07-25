@@ -1,0 +1,17 @@
+{
+  "status": "stopped_superseded",
+  "streak": 1,
+  "target": 10,
+  "controller_pid": null,
+  "verifier_pid": null,
+  "stopped_at": "2026-07-14T20:18:06Z",
+  "stop_reason": "Superseded by independently verified authoritative multi-model streak sequences 18-27 under /Users/hermes/Documents/Codex/2026-07-14/ringer-authoritative-multimodel.",
+  "registered_run_ids": [
+    "ringer-reliability-tools-20260714-1447-20260714T195347Z-p58930"
+  ],
+  "processed_run_ids": [
+    "ringer-reliability-tools-20260714-1447-20260714T195347Z-p58930"
+  ],
+  "updated_at": "2026-07-14T20:01:44.626277+00:00",
+  "safe_word": "jack-green-phoenix"
+}

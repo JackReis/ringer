@@ -303,6 +303,19 @@
       grid-column: 2 / -1; font-size: 13px; color: var(--muted);
       min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
+    .worker .fleet-links {
+      grid-column: 2 / -1;
+      display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px;
+    }
+    .worker .fleet-badge {
+      display: inline-block; padding: 1px 6px; border-radius: 3px;
+      font-size: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      border: 1px solid var(--hairline); color: var(--muted);
+    }
+    .worker .fleet-badge.pc { border-color: #6b8af3; color: #6b8af3; }
+    .worker .fleet-badge.bead { border-color: #e8a735; color: #e8a735; }
+    .worker .fleet-badge.routine { border-color: #8b5cf6; color: #8b5cf6; }
+    .worker .fleet-badge.goal { border-color: #10b981; color: #10b981; }
     .stream {
       padding: 0 0 14px 30px;
       border-bottom: 1px solid var(--hairline);
@@ -954,6 +967,44 @@
             line.textContent = activity;
             row.appendChild(line);
           }
+
+          // Fleet cross-link badges (JAC-3487): Routine/Goal references
+          const fleetLinks = document.createElement("span");
+          fleetLinks.className = "fleet-links";
+          const pcIssue = (task.paperclip_issue || "").trim();
+          const beadId = (task.bead_id || "").trim();
+          const routineId = (task.routine_id || "").trim();
+          const goalId = (task.goal_id || "").trim();
+          if (pcIssue) {
+            const badge = document.createElement("span");
+            badge.className = "fleet-badge pc";
+            badge.textContent = pcIssue;
+            badge.title = "Paperclip issue";
+            fleetLinks.appendChild(badge);
+          }
+          if (beadId) {
+            const badge = document.createElement("span");
+            badge.className = "fleet-badge bead";
+            badge.textContent = beadId;
+            badge.title = "Beads issue";
+            fleetLinks.appendChild(badge);
+          }
+          if (routineId) {
+            const badge = document.createElement("span");
+            badge.className = "fleet-badge routine";
+            badge.textContent = routineId.slice(0, 8) + "…";
+            badge.title = "Paperclip Routine";
+            fleetLinks.appendChild(badge);
+          }
+          if (goalId) {
+            const badge = document.createElement("span");
+            badge.className = "fleet-badge goal";
+            badge.textContent = goalId.slice(0, 8) + "…";
+            badge.title = "Paperclip Goal";
+            fleetLinks.appendChild(badge);
+          }
+          if (fleetLinks.children.length) row.appendChild(fleetLinks);
+
           workers.appendChild(row);
 
           if (isExpanded) workers.appendChild(renderStream(run, task, taskIndex));

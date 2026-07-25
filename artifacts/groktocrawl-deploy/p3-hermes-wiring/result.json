@@ -1,0 +1,16 @@
+{
+  "status": "P3_OK",
+  "phase": "P3-hermes-wiring",
+  "timestamp": "2026-07-20T13:37:48.586759",
+  "host": "Aegis",
+  "checks": {
+    "env_GROKTOCRAWL_API_URL": true,
+    "env_value": "http://127.0.0.1:8080",
+    "config_mcp_servers_groktocrawl": true,
+    "mcp_url": "http://127.0.0.1:8002",
+    "skill_copied": true,
+    "cli_symlinked": true
+  },
+  "reload_needed": "Hermes runtime must reload to register the new MCP server (config has mcp_reload_confirm: true). NOT restarted by agent \u2014 flagged for Jack.",
+  "backups": "config.yaml.bak.groktocrawl.* and .env.bak.groktocrawl.* in ~/.hermes/"
+}

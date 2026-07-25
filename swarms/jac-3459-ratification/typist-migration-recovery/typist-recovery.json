@@ -1,0 +1,16 @@
+{
+  "verdict": "PASS",
+  "event_count": 1,
+  "idempotent": true,
+  "backup_path": "/Users/hermes/Library/Application Support/FamilyBulletin/backups/bulletin-events-backup-20260715T014008Z.db",
+  "restore_verified": true,
+  "evidence": [
+    "Database exists at ~/Library/Application Support/FamilyBulletin/bulletin-events.db (24576 bytes)",
+    "Table bulletin_events has correct schema with id, contract_version, kind, subject_id, payload, author, source, classification, occurred_at, recorded_at, expires_at, supersedes_event_id, idempotency_key, created_at columns",
+    "Exactly 1 event row with id=1a9f2cfb-9826-40c5-8379-333d45b8613a (kind=note.added, subject_id=jack-reis, classification=family)",
+    "INSERT OR IGNORE with same idempotency_key keeps count at 1 (idempotent=true) — verified on temp copy",
+    "Backup exists at ~/Library/Application Support/FamilyBulletin/backups/bulletin-events-backup-20260715T014008Z.db (24576 bytes)",
+    "Backup/restore drill on temp copy: delete all (count=0), restore via ATTACH DATABASE (count=1), data matches original row exactly (restore_verified=true)",
+    "Backup file contains the same single event with matching id"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "run_name": "open-fleet-host-contract-smoke",
+  "workdir": "/Users/hermes/.ringer/work/open-fleet-host-contract-smoke",
+  "risk": "low",
+  "orchestrator": {
+    "provider": "local",
+    "model": "mock",
+    "family": "deterministic",
+    "runtime": "hermes-ringer",
+    "attestation": "Zero-cost deterministic smoke test for the Aegis-authoritative and Talaris-read-replica contract"
+  },
+  "max_parallel": 1,
+  "worktrees": false,
+  "tasks": [
+    {
+      "key": "host-contract-evidence",
+      "engine": "mock",
+      "task_type": "coordination-smoke",
+      "paperclip_issue": "JAC-3643",
+      "bead_id": "hermes-wiqb",
+      "spec": "MOCK_FILE: evidence.json\n{\"aegis\":\"authoritative-execution-hub\",\"talaris\":\"read-only-work-state-replica\",\"ringer\":\"shared-ingest-and-receipts\",\"paperclip\":\"execution-traces-artifacts-run-links\",\"hermes\":\"learn-loop-orchestrator\",\"open_surface\":\"open-engine-open-skills\",\"issue_comments\":\"durable-collaboration-context\"}\nMOCK_END",
+      "check": "python3 -c 'import json; from pathlib import Path; d=json.loads(Path(\"evidence.json\").read_text()); expected={\"aegis\":\"authoritative-execution-hub\",\"talaris\":\"read-only-work-state-replica\",\"ringer\":\"shared-ingest-and-receipts\",\"paperclip\":\"execution-traces-artifacts-run-links\",\"hermes\":\"learn-loop-orchestrator\",\"open_surface\":\"open-engine-open-skills\",\"issue_comments\":\"durable-collaboration-context\"}; print(\"PASS: Open Fleet host contract verified\" if d==expected else \"FAIL: host contract drift\"); raise SystemExit(0 if d==expected else 1)'",
+      "expect_files": [
+        "evidence.json"
+      ],
+      "timeout_s": 60,
+      "verified": "The generated evidence exactly matches the frozen Aegis/Talaris Open Fleet authority and collaboration contract."
+    }
+  ]
+}

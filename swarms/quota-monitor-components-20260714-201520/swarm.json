@@ -1,0 +1,56 @@
+{
+  "schema_version": 3,
+  "run_name": "quota-monitor-components-20260714-201520",
+  "workdir": "/Users/hermes/ringer/swarms/quota-monitor-components-20260714-201520/work",
+  "max_parallel": 3,
+  "worktrees": false,
+  "default_engine": "codex",
+  "identity": "aegis",
+  "tasks": [
+    {
+      "key": "quota-alert-manager",
+      "task_type": "code-feature",
+      "engine": "codex",
+      "model": "gpt-5.5",
+      "timeout_s": 600,
+      "bead_id": "hermes-ggio.3",
+      "spec": "Implement a production-quality, standard-library-only Python 3 quota alert manager in the current task directory. Do not inspect or modify anything outside this directory. Do not call the live Paperclip API, read live credentials, or write outside the task directory. Start implementation immediately.\n\nCreate quota_alert_manager.py with CLI arguments --probe PATH, --usage PATH, --thresholds PATH, --api-base URL, --company-id ID, --assignee-id ID, --report PATH, and optional --dry-run. Read the provider probe JSON, monthly token-usage JSON, and threshold JSON without trusting their contents. Derive one alert per provider and reason when a provider is down, is rate-limited, or has total_estimated_cost_usd at or above the configured warn_fraction of monthly_budget_usd. Use titles exactly '[QUOTA ALERT] <provider> <reason>' with reason values down, rate-limited, or budget. Query the Paperclip company issues endpoint, update an existing open matching alert instead of creating duplicates, create missing alerts assigned to the supplied assignee, and resolve matching open alerts after recovery. Use urllib.request; optional Authorization and X-Paperclip-Run-Id headers may only come from PAPERCLIP_API_KEY and PAPERCLIP_RUN_ID environment variables and must never appear in logs, reports, errors, URLs, or source fixtures. --dry-run performs no mutation but reports planned actions. Emit an atomic deterministic report with generated_at, alert_count, actions, and errors; action rows contain only provider, reason, action, and issue identifier when available. Exit 0 when inputs are valid and all requested API operations succeed, otherwise exit 1. Fail cleanly without tracebacks and sanitize network errors.\n\nCreate test_quota_alert_manager.py using unittest, temporary JSON fixtures, and a local ThreadingHTTPServer only. Cover creation for down and rate-limited providers, budget threshold crossing, deduplicating via update, recovery via resolve, dry-run with zero mutations, malformed inputs, missing threshold behavior, deterministic action ordering, nested atomic report creation, API failure, environment-header forwarding without disclosure, and absence of a secret fixture marker from outputs and errors. Invoke the CLI as a subprocess and exercise core functions. Include type hints and concise docstrings. Create no files beyond the two expected files and test temporaries.",
+      "check": "set -eu; /Users/hermes/homebrew/bin/python3 -m unittest -v test_quota_alert_manager.py; /Users/hermes/homebrew/bin/python3 -m py_compile quota_alert_manager.py test_quota_alert_manager.py; /Users/hermes/homebrew/bin/python3 - <<'PY'\nfrom pathlib import Path\nfor name in ('quota_alert_manager.py','test_quota_alert_manager.py'):\n p=Path(name); assert p.is_file() and p.stat().st_size > 700, f'FAIL: {name} missing or trivial'\ntext=Path('quota_alert_manager.py').read_text()\nfor token in ('--probe','--usage','--thresholds','--dry-run','PAPERCLIP_API_KEY','rate-limited'):\n assert token in text, f'FAIL: required contract token absent: {token}'\nprint('PASS: quota alert manager compiles and executable local-API fixtures prove create, update, recovery, budget, dry-run, atomicity, and secret-safe behavior.')\nPY",
+      "expect_files": [
+        "quota_alert_manager.py",
+        "test_quota_alert_manager.py"
+      ],
+      "verified": "Executable local-API fixtures prove the quota alert manager creates, deduplicates, updates, and resolves provider alerts without exposing credentials or mutating live Paperclip state."
+    },
+    {
+      "key": "quota-dashboard-renderer",
+      "task_type": "data-pipeline",
+      "engine": "opencode",
+      "model": "ollama/qwen3-coder:30b",
+      "timeout_s": 600,
+      "bead_id": "hermes-ggio.5",
+      "spec": "Implement a production-quality, standard-library-only Python 3 Markdown dashboard renderer in the current task directory. Do not inspect or modify anything outside this directory. Do not read the live ledger or Obsidian vault. Start implementation immediately.\n\nCreate render_quota_dashboard.py with CLI arguments --probe PATH, --usage-24h PATH, --usage-month PATH, --thresholds PATH, --alerts PATH, --history PATH, and --output PATH. Read the quota monitor's machine-readable JSON artifacts and an optional append-only JSONL history. Render deterministic Markdown with YAML frontmatter and these sections: Current Provider Status, 24-Hour Token Usage, Monthly Spend vs Budget, Active Alerts, and Seven-Day Probe History. Provider rows must be sorted lexicographically. Show status, last checked, integer latency, input/output tokens, six-decimal cost, configured budget, percentage used, and stable alert reason. Summarize the last seven UTC calendar days of valid history while ignoring blank lines. Escape Markdown table delimiters and control characters. Never render URLs, response bodies, headers, exception strings, environment values, or fields not explicitly allowlisted. Reject malformed required inputs cleanly; treat missing alerts/history files as empty. Write output atomically with parent creation and preserve no temporary file. Exit 0 on success and 1 without traceback on validation failure.\n\nCreate test_render_quota_dashboard.py using unittest and temporary fixtures only. Cover a complete multi-provider dashboard, lexical ordering, missing optional files, malformed required JSON, empty providers, budget percentage calculations including zero budget, seven-day history cutoff, invalid JSONL with a useful line number, Markdown escaping, deterministic output under a fixed generated_at input, nested atomic output, and redaction of secret-like extra fields. Invoke the CLI via subprocess and exercise core functions. Include type hints and concise docstrings. Create no files beyond the two expected files and test temporaries.",
+      "check": "set -eu; /Users/hermes/homebrew/bin/python3 -m unittest -v test_render_quota_dashboard.py; /Users/hermes/homebrew/bin/python3 -m py_compile render_quota_dashboard.py test_render_quota_dashboard.py; /Users/hermes/homebrew/bin/python3 - <<'PY'\nfrom pathlib import Path\nfor name in ('render_quota_dashboard.py','test_render_quota_dashboard.py'):\n p=Path(name); assert p.is_file() and p.stat().st_size > 700, f'FAIL: {name} missing or trivial'\ntext=Path('render_quota_dashboard.py').read_text()\nfor token in ('Current Provider Status','24-Hour Token Usage','Monthly Spend vs Budget','Active Alerts','Seven-Day Probe History'):\n assert token in text, f'FAIL: dashboard section absent: {token}'\nprint('PASS: quota dashboard renderer compiles and executable fixtures prove deterministic, escaped, redacted dashboard generation from ledger artifacts.')\nPY",
+      "expect_files": [
+        "render_quota_dashboard.py",
+        "test_render_quota_dashboard.py"
+      ],
+      "verified": "Executable fixtures prove the renderer produces a deterministic, escaped, redacted fleet quota dashboard with current status, usage, budgets, alerts, and seven-day history."
+    },
+    {
+      "key": "quota-monitor-wrapper",
+      "task_type": "code-feature",
+      "engine": "opencode",
+      "model": "ollama/qwen3-coder:30b",
+      "timeout_s": 600,
+      "bead_id": "hermes-ggio.4",
+      "spec": "Implement a production-quality POSIX shell orchestration wrapper and standard-library Python test suite in the current task directory. Do not inspect or modify anything outside this directory. Do not install cron jobs, call live providers, read credentials, or write to the live Hermes ledger. Start implementation immediately.\n\nCreate quota_monitor.sh. It accepts exactly one argument: a JSON config path. Parse configuration by invoking a configurable Python interpreter from PYTHON_BIN, defaulting to python3; do not depend on jq. Required config keys are probe_command, aggregate_command, alert_command, dashboard_command, probe_output, usage_24h_output, usage_month_output, alert_report, dashboard_output, and history_output. Each command is a JSON array of strings and must be executed without eval or shell re-parsing. Run stages strictly probe, aggregate, alert, dashboard. Probe exit 1 means provider alerts exist and must not prevent aggregate/alert/dashboard; any exit above 1 is a critical pipeline failure. Aggregate, alert, or dashboard nonzero is critical. Append one compact JSON line to history_output atomically enough for a single-process cron lane, containing timestamp, stage statuses, alert_count from the alert report, and provider status counts from the probe report. Keep stdout empty when all providers are up and alert_count is zero. Otherwise print exactly one concise line beginning 'QUOTA ALERT:'; critical failures print exactly one line beginning 'QUOTA MONITOR ERROR:' to stderr and exit nonzero. Never print command arguments, paths, JSON payloads, environment values, or subprocess output; redirect stage output to private temporary files and remove them via trap. Use set -eu and quote all paths.\n\nCreate test_quota_monitor.py using unittest and temporary executable stub scripts only. Invoke quota_monitor.sh via subprocess. Cover healthy silent success, provider-alert exit 1 continuing through all stages, critical probe failure stopping later stages, aggregate failure, alert failure, dashboard failure, strict stage order, one-line history schema, nested history parent creation, no eval injection from hostile command arguments, temporary cleanup, deterministic alert/error prefixes, and absence of a secret fixture marker from stdout, stderr, and history. Create no files beyond the two expected files and test temporaries.",
+      "check": "set -eu; /Users/hermes/homebrew/bin/python3 -m unittest -v test_quota_monitor.py; /Users/hermes/homebrew/bin/python3 -m py_compile test_quota_monitor.py; /Users/hermes/homebrew/bin/python3 - <<'PY'\nfrom pathlib import Path\nfor name in ('quota_monitor.sh','test_quota_monitor.py'):\n p=Path(name); assert p.is_file() and p.stat().st_size > 700, f'FAIL: {name} missing or trivial'\ntext=Path('quota_monitor.sh').read_text()\nassert 'set -eu' in text, 'FAIL: wrapper lacks fail-fast mode'\nassert 'eval ' not in text, 'FAIL: wrapper must not use eval'\nprint('PASS: quota monitor wrapper passes executable stub-pipeline tests for stage order, alert continuation, critical failures, quiet health, history, cleanup, and injection resistance.')\nPY",
+      "expect_files": [
+        "quota_monitor.sh",
+        "test_quota_monitor.py"
+      ],
+      "verified": "Executable stub-pipeline fixtures prove the shell wrapper runs quota stages in order, continues on provider alerts, fails on critical errors, stays quiet when healthy, and appends secret-safe history."
+    }
+  ]
+}

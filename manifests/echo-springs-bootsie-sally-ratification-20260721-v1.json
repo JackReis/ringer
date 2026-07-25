@@ -1,0 +1,50 @@
+{
+  "run_name": "echo-springs-bootsie-sally-ratification-20260721-v1",
+  "workdir": "/Users/hermes/.ringer/work/echo-springs-ratification",
+  "max_parallel": 3,
+  "risk": "medium",
+  "paperclip_issue": "JAC-3501",
+  "bead_id": "notes-a1bty.7",
+  "orchestrator": {
+    "provider": "ollama-cloud",
+    "model": "deepseek-v4-pro",
+    "family": "deepseek-v4",
+    "runtime": "hermes-aegis",
+    "attestation": "Aegis Hermes session 2026-07-21, JAC-3501 unblocked by JAC-3750"
+  },
+  "tasks": [
+    {
+      "key": "grounding-review",
+      "task_type": "code-review",
+      "engine": "opencode",
+      "model": "lm-studio/google/gemma-4-26b-a4b-qat",
+      "spec": "You are a read-only scout in a multi-agent review swarm for Echo Springs Camp Wiki (a React+TypeScript+Vite web app at /Users/hermes/Projects/echo-springs/app/ — a camper-operated camp wiki with 10 chapter pages, Camp State Worksheet, and Visit Log). Boundary: the repo at '/Users/hermes/Projects/echo-springs/app/' is source material only. Never modify, create, delete, format, install, or commit anything in that repo. You own exactly one output file in your task directory: ./report.md.\n\nYour surface: CONTENT GROUNDING. Review all 10 chapter pages (src/pages/Chapter01.tsx through Chapter10.tsx), the Worksheet (src/pages/Worksheet.tsx), and the Home page (src/pages/Home.tsx) for factual accuracy against the master markdown at /Users/hermes/Projects/echo-springs/echo-springs-runbook.agent.final.md.\n\nReview dimensions:\n- Do chapter pages contain content that matches the master markdown?\n- Are any sections missing, truncated, or fabricated?\n- Do emergency procedures (Chapter08) match the master markdown exactly?\n- Are camp operation details (water, power, propane) factually correct?\n- Is the Worksheet collecting the right fields per the master markdown?\n\nHOW TO RUN: inspect the repo with read-only commands from your task directory. Use rg (ripgrep) to search for content patterns, compare against the master markdown. Read the master markdown first, then cross-reference each chapter.\n\nOUTPUT CONTRACT for ./report.md: start with '# Review Report'. Include '## Summary' with no more than 3 bullets, '## Findings', '## Clean', and '## Assumptions'. Each finding must use this exact field shape: '### Finding: <neutral summary>', then 'Evidence:', 'Impact:', 'Fix:', 'Priority: P0|P1|P2|P3', and 'Confidence: high|medium|low'. Evidence must cite file:line and quote only the needed words. If there are no findings, write 'No findings for this surface.' under Findings and still fill Clean by dimension. Hard rules: no invented facts, mark assumptions, never modify files outside the task directory, and keep the report under 1200 words.",
+      "check": "/opt/homebrew/bin/python3.14 /Users/hermes/ringer/templates/review-swarm/checks/review-swarm.py --report report.md --surface grounding",
+      "expect_files": ["report.md"],
+      "timeout_s": 900,
+      "verified": "report.md follows the review output contract, includes named sections, and any finding carries evidence, impact, fix, priority, and confidence fields"
+    },
+    {
+      "key": "security-review",
+      "task_type": "code-review",
+      "engine": "opencode",
+      "model": "lm-studio/google/gemma-4-26b-a4b-qat",
+      "spec": "You are a read-only scout in a multi-agent review swarm for Echo Springs Camp Wiki (a React+TypeScript+Vite web app at /Users/hermes/Projects/echo-springs/app/ — a camper-operated camp wiki with 10 chapter pages, Camp State Worksheet, and Visit Log). Boundary: the repo at '/Users/hermes/Projects/echo-springs/app/' is source material only. Never modify, create, delete, format, install, or commit anything in that repo. You own exactly one output file in your task directory: ./report.md.\n\nYour surface: SECURITY & PRIVACY. Review the full app source for security vulnerabilities and privacy issues.\n\nReview dimensions:\n- XSS: does any user-supplied data (Worksheet fields, Visit Log entries) render unsanitized?\n- Auth: is the PasswordGate (src/components/PasswordGate.tsx) client-side only? Is the password hardcoded?\n- Data exposure: does localStorage contain sensitive data? Is any data sent to external servers?\n- Dependency audit: check package.json for known-vulnerable versions\n- CSP/headers: does the deployed app have security headers?\n- Input validation: are Worksheet and Log fields validated before storage?\n\nHOW TO RUN: inspect the repo with read-only commands from your task directory. Use rg to find dangerouslySetInnerHTML, innerHTML, eval, localStorage.setItem, fetch calls, password references. Read PasswordGate.tsx, useCampStorage.ts, and any API call files.\n\nOUTPUT CONTRACT for ./report.md: start with '# Review Report'. Include '## Summary' with no more than 3 bullets, '## Findings', '## Clean', and '## Assumptions'. Each finding must use this exact field shape: '### Finding: <neutral summary>', then 'Evidence:', 'Impact:', 'Fix:', 'Priority: P0|P1|P2|P3', and 'Confidence: high|medium|low'. Evidence must cite file:line and quote only the needed words. If there are no findings, write 'No findings for this surface.' under Findings and still fill Clean by dimension. Hard rules: no invented facts, mark assumptions, never modify files outside the task directory, and keep the report under 1200 words.",
+      "check": "/opt/homebrew/bin/python3.14 /Users/hermes/ringer/templates/review-swarm/checks/review-swarm.py --report report.md --surface security",
+      "expect_files": ["report.md"],
+      "timeout_s": 900,
+      "verified": "report.md follows the review output contract, includes named sections, and any finding carries evidence, impact, fix, priority, and confidence fields"
+    },
+    {
+      "key": "sally-parity-review",
+      "task_type": "code-review",
+      "engine": "opencode",
+      "model": "lm-studio/google/gemma-4-26b-a4b-qat",
+      "spec": "You are a read-only scout in a multi-agent review swarm for Echo Springs Camp Wiki (a React+TypeScript+Vite web app at /Users/hermes/Projects/echo-springs/app/ — a camper-operated camp wiki with 10 chapter pages, Camp State Worksheet, and Visit Log). Boundary: the repo at '/Users/hermes/Projects/echo-springs/app/' is source material only. Never modify, create, delete, format, install, or commit anything in that repo. You own exactly one output file in your task directory: ./report.md.\n\nYour surface: UX & SALLY PARITY. Review the app for user experience quality and parity with the original Sally design system.\n\nReview dimensions:\n- Navigation: is the mobile bottom nav + desktop top nav (Navbar.tsx) functional and consistent across all pages?\n- Responsiveness: do all pages render correctly at 375px, 768px, and 1280px widths? Check Tailwind responsive classes.\n- Accessibility: are there aria labels, keyboard navigation, color contrast issues?\n- Design consistency: do all pages follow the design system (check design.md if present, otherwise check for consistent use of Tailwind classes, spacing, typography)?\n- Worksheet UX: is the Camp State Worksheet intuitive? Are all fields clearly labeled?\n- Visit Log UX: is the log easy to use? Can visits be added, viewed, and exported?\n- Password gate UX: is the gate clear and does it provide feedback on wrong passwords?\n- Loading/empty states: are there appropriate loading states and empty-state messages?\n\nHOW TO RUN: inspect the repo with read-only commands from your task directory. Read all page components, Navbar.tsx, Layout.tsx, PasswordGate.tsx, Worksheet.tsx, Log.tsx. Check for Tailwind responsive prefixes (sm:, md:, lg:), aria attributes, semantic HTML.\n\nOUTPUT CONTRACT for ./report.md: start with '# Review Report'. Include '## Summary' with no more than 3 bullets, '## Findings', '## Clean', and '## Assumptions'. Each finding must use this exact field shape: '### Finding: <neutral summary>', then 'Evidence:', 'Impact:', 'Fix:', 'Priority: P0|P1|P2|P3', and 'Confidence: high|medium|low'. Evidence must cite file:line and quote only the needed words. If there are no findings, write 'No findings for this surface.' under Findings and still fill Clean by dimension. Hard rules: no invented facts, mark assumptions, never modify files outside the task directory, and keep the report under 1200 words.",
+      "check": "/opt/homebrew/bin/python3.14 /Users/hermes/ringer/templates/review-swarm/checks/review-swarm.py --report report.md --surface sally-parity",
+      "expect_files": ["report.md"],
+      "timeout_s": 900,
+      "verified": "report.md follows the review output contract, includes named sections, and any finding carries evidence, impact, fix, priority, and confidence fields"
+    }
+  ]
+}

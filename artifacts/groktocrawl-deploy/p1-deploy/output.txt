@@ -1,0 +1,26 @@
+P1 Deploy - GroktoCrawl Aegis
+===========================
+
+SECURITY GATE: API_KEY verified non-empty before compose up (length=52)
+
+COMPOSE PS:
+groktocrawl-agent-svc-1      healthy   0.0.0.0:8080->8080/tcp
+groktocrawl-browser-svc-1    Up
+groktocrawl-mcp-svc-1        healthy   0.0.0.0:8002->8002/tcp
+groktocrawl-ofelia-1         Up
+groktocrawl-parse-svc-1      Up
+groktocrawl-portal-svc-1     Up        0.0.0.0:8082->8081/tcp
+groktocrawl-qdrant-1         Up
+groktocrawl-scraper-svc-1    Up        0.0.0.0:8001->8001/tcp
+groktocrawl-semantic-svc-1   healthy   0.0.0.0:8003->8003/tcp
+groktocrawl-slopsearx-1      healthy   0.0.0.0:8081->8080/tcp
+groktocrawl-valkey-1         healthy
+
+HEALTH JSON:
+{"status":"ok","checks":{"valkey":{"status":"ok","latency_ms":3.8,"detail":"Valkey PING ok"},"searxng":{"status":"ok","latency_ms":28.4,"detail":"SearXNG health ok"},"scraper":{"status":"ok","latency_ms":18.7,"detail":"Scraper responded HTTP 404"},"browser":{"status":"ok","latency_ms":12.0,"detail":"Browser responded HTTP 404"},"portal":{"status":"ok","latency_ms":7.5,"detail":"Portal responded HTTP 200"}}}
+
+UNAUTH PROBE (must be 401/403):
+HTTP 403 - auth gate ON
+
+:8002 MCP SURFACE:
+HTTP 404 - port listening

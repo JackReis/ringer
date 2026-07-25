@@ -1,0 +1,27 @@
+{
+  "run_name": "routines-goals-demo",
+  "workdir": "/tmp/ringer-routines-goals-demo",
+  "max_parallel": 2,
+  "tasks": [
+    {
+      "key": "routine-linked-task",
+      "spec": "Create a file called result.txt containing exactly: routine goal integration verified",
+      "check": "test \"$(cat result.txt)\" = \"routine goal integration verified\"",
+      "expect_files": ["result.txt"],
+      "model": "gpt-5.5",
+      "verified": "Output file matches expected string exactly",
+      "paperclip_issue": "JAC-3442",
+      "routine_id": "9ab1a748-fb2d-42a5-88b6-0b3788751a04",
+      "goal_id": "219e8069-c648-46ff-afef-d5f06d0bd6e2"
+    },
+    {
+      "key": "goal-only-task",
+      "spec": "Create a file called goal_check.txt containing exactly: goal projection works",
+      "check": "test \"$(cat goal_check.txt)\" = \"goal projection works\"",
+      "expect_files": ["goal_check.txt"],
+      "model": "gpt-5.5",
+      "verified": "Output file matches expected string exactly",
+      "goal_id": "219e8069-c648-46ff-afef-d5f06d0bd6e2"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "run_name": "fleet-status-components",
+  "workdir": "/tmp/ringer-fleet-status",
+  "max_parallel": 3,
+  "tasks": [
+    {
+      "key": "beads-summary",
+      "spec": "Create a Python script named beads_summary.py in the current working directory. The script must:\n1. Run `bd list --json` and parse the output as JSON\n2. Count issues by status (open, in_progress, closed, blocked)\n3. Print a JSON object to stdout with this exact shape: {\"total\": N, \"open\": N, \"in_progress\": N, \"closed\": N, \"blocked\": N}\n4. Handle the case where bd is not installed by printing {\"error\": \"bd not found\"} and exiting 0\n5. No external dependencies beyond Python stdlib\nDo not write any other files.",
+      "check": "python3 beads_summary.py && python3 -c \"import json,subprocess; out=subprocess.check_output(['python3','beads_summary.py'],text=True); d=json.loads(out); assert 'total' in d and isinstance(d['total'],int), 'missing total'; print('beads_summary OK')\"",
+      "expect_files": ["beads_summary.py"],
+      "engine": "opencode",
+      "model": "ollama/qwen3-coder:30b",
+      "timeout_s": 300,
+      "verified": "beads_summary.py runs without error and outputs valid JSON with integer counts",
+      "task_type": "code-feature"
+    },
+    {
+      "key": "brain-health",
+      "spec": "Create a Python script named brain_health.py in the current working directory. The script must:\n1. Make an HTTP GET request to http://127.0.0.1:8787/ (the local Aegis brain) using only urllib from the stdlib\n2. Parse the JSON response and extract any health/status fields (look for keys like 'status', 'healthy', 'thoughts', 'count')\n3. Print a JSON object to stdout with this shape: {\"endpoint\": \"http://127.0.0.1:8787/\", \"reachable\": true/false, \"details\": {...}}\n4. Handle connection errors by printing {\"endpoint\": \"http://127.0.0.1:8787/\", \"reachable\": false, \"details\": {\"error\": \"<error message>\"}} and exiting 0\n5. No external dependencies beyond Python stdlib\nDo not write any other files.",
+      "check": "python3 brain_health.py && python3 -c \"import json,subprocess; out=subprocess.check_output(['python3','brain_health.py'],text=True); d=json.loads(out); assert 'reachable' in d and isinstance(d['reachable'],bool), 'missing reachable bool'; print('brain_health OK')\"",
+      "expect_files": ["brain_health.py"],
+      "engine": "opencode",
+      "model": "ollama/qwen3-coder:30b",
+      "timeout_s": 300,
+      "verified": "brain_health.py runs without error, connects to local brain, outputs JSON with reachable boolean",
+      "task_type": "code-feature"
+    },
+    {
+      "key": "ollama-status",
+      "spec": "Create a Python script named ollama_status.py in the current working directory. The script must:\n1. Make an HTTP GET request to http://127.0.0.1:11434/api/tags (the local Ollama instance) using only urllib from the stdlib\n2. Parse the JSON response and extract the list of models, collecting each model's name\n3. Print a JSON object to stdout with this shape: {\"endpoint\": \"http://127.0.0.1:11434\", \"models\": [\"model1\", \"model2\", ...], \"count\": N}\n4. Handle connection errors by printing {\"endpoint\": \"http://127.0.0.1:11434\", \"models\": [], \"count\": 0, \"error\": \"<error message>\"} and exiting 0\n5. No external dependencies beyond Python stdlib\nDo not write any other files.",
+      "check": "python3 ollama_status.py && python3 -c \"import json,subprocess; out=subprocess.check_output(['python3','ollama_status.py'],text=True); d=json.loads(out); assert 'models' in d and isinstance(d['models'],list), 'missing models list'; assert 'count' in d and isinstance(d['count'],int), 'missing count int'; print('ollama_status OK')\"",
+      "expect_files": ["ollama_status.py"],
+      "engine": "opencode",
+      "model": "ollama/qwen3-coder:30b",
+      "timeout_s": 300,
+      "verified": "ollama_status.py runs without error, queries local Ollama, outputs JSON with models list and integer count",
+      "task_type": "code-feature"
+    }
+  ]
+}

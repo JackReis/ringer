@@ -1,0 +1,52 @@
+{
+  "registry_type": "agent-skills",
+  "source": "mattpocock/skills v1.1",
+  "source_url": "https://github.com/mattpocock/skills",
+  "installed_at": "2026-07-09T23:42:00Z",
+  "installed_on": ["talaris:.openclaw/skills", "talaris:.claude/skills", "aegis:.openclaw/skills", "aegis:.claude/skills"],
+  "skills": {
+    "engineering": {
+      "ask-matt": {"invocation": "user", "description": "Router over user-invoked skills in this repo"},
+      "grill-with-docs": {"invocation": "user", "description": "Grilling session that builds domain model, CONTEXT.md, and ADRs inline"},
+      "triage": {"invocation": "user", "description": "Move issues through a state machine of triage roles"},
+      "improve-codebase-architecture": {"invocation": "user", "description": "Scan codebase for deepening opportunities, present as HTML report"},
+      "setup-matt-pocock-skills": {"invocation": "user", "description": "Configure repo for engineering skills (tracker, labels, doc layout)"},
+      "to-spec": {"invocation": "user", "description": "Turn conversation into a spec, publish to issue tracker. Renamed from /to-prd"},
+      "to-tickets": {"invocation": "user", "description": "Break plan/spec/conversation into tracer-bullet tickets with blocking edges. Merged from /to-plan + /to-issues"},
+      "wayfinder": {"invocation": "user", "description": "Plan huge work as shared map of investigation tickets on issue tracker"},
+      "prototype": {"invocation": "model", "description": "Build throwaway prototype: logic (terminal) or UI (toggleable variations)"},
+      "diagnosing-bugs": {"invocation": "model", "description": "Disciplined diagnosis loop: reproduce → minimise → hypothesise → instrument → fix → regression-test"},
+      "research": {"invocation": "model", "description": "Investigate question against primary sources, write findings as Markdown, background agent"},
+      "tdd": {"invocation": "model", "description": "Red-green-refactor TDD. Reference material only, no step-by-step confirmation"},
+      "domain-modeling": {"invocation": "model", "description": "Build and sharpen project domain model, update CONTEXT.md and ADRs"},
+      "codebase-design": {"invocation": "model", "description": "Shared discipline for designing deep modules: small interfaces, clean seams"},
+      "code-review": {"invocation": "model", "description": "Two-axis review: Standards (coding standards + Fowler smells) and Spec correctness, parallel sub-agents"},
+      "implement": {"invocation": "model", "description": "Implement work from spec/tickets. Use TDD at pre-agreed seams. Run type checking regularly"},
+      "resolving-merge-conflicts": {"invocation": "model", "description": "Resolve merge conflicts systematically"}
+    },
+    "productivity": {
+      "grill-me": {"invocation": "user", "description": "Get relentlessly interviewed about a plan or design"},
+      "grilling": {"invocation": "model", "description": "Interview user relentlessly until every branch of decision tree is resolved"},
+      "handoff": {"invocation": "user", "description": "Compact conversation into handoff document for another agent"},
+      "teach": {"invocation": "user", "description": "Teach user a new skill over multiple sessions"},
+      "writing-great-skills": {"invocation": "model", "description": "Reference for writing and editing skills well"}
+    },
+    "misc": {
+      "git-guardrails-claude-code": {"invocation": "user", "description": "Set up hooks to block dangerous git commands"},
+      "migrate-to-shoehorn": {"invocation": "user", "description": "Migrate test files to @total-typescript/shoehorn"},
+      "scaffold-exercises": {"invocation": "user", "description": "Create exercise directory structures"},
+      "setup-pre-commit": {"invocation": "user", "description": "Set up Husky pre-commit hooks with lint-staged, Prettier, type checking, tests"}
+    }
+  },
+  "renames": {
+    "to-prd": "to-spec",
+    "to-plan": "to-tickets",
+    "to-issues": "to-tickets"
+  },
+  "deprecated": ["ubiquitous-language", "design-an-interface", "request-refactor-plan"],
+  "ringer_integration": {
+    "manifest_template": "templates/pocock-dev-lifecycle/manifest.json",
+    "flow": "grilling → to-spec → to-tickets → implement → code-review",
+    "wayfinder_flow": "wayfinder (for large plans) → to-spec → to-tickets → implement → code-review"
+  }
+}

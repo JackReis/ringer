@@ -1,0 +1,16 @@
+{
+  "attempts": 1,
+  "ended_at": "2026-07-14T21:58:45.844969Z",
+  "last_clean": false,
+  "last_run_id": null,
+  "legacy_pid": 49609,
+  "legacy_pid_alive": false,
+  "reconciled_at": "2026-07-14T21:58:45.844969Z",
+  "reconciliation_reason": "Legacy continuation claimed running after PID 49609 exited; authoritative verified continuation is stopped_superseded.",
+  "safe_word": "jack-green-phoenix",
+  "started_at": "2026-07-14T19:45:20.483961+00:00",
+  "status": "stopped_superseded",
+  "streak": 0,
+  "superseded_by": "/Users/hermes/ringer/.ringer/ten-streak-oneshots/verified-continuation-state.json",
+  "updated_at": "2026-07-14T20:08:40.972216+00:00"
+}

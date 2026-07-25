@@ -1,0 +1,88 @@
+{
+  "schema_version": "ringer.hindsight-bind-correction.v1",
+  "checked_at": "2026-07-15T02:06:38.991746+00:00",
+  "bead": "hermes-24i8",
+  "preflight_path": "/Users/hermes/ringer/artifacts/talaris-memory-ports-preflight-20260715.json",
+  "talaris_hostname": "Talaris",
+  "configured_port_claim": 9177,
+  "observed_bind_port": 8888,
+  "healthy_port": 8888,
+  "port_9177_listener_present": false,
+  "port_9177_health_success": false,
+  "mismatch_verified": true,
+  "evidence_by_source": {
+    "process_argument": {
+      "source": "ps command line for PID 4659",
+      "evidence": "/Users/jack.reis/.hermes/hermes-agent/.venv/bin/hindsight-api --daemon --idle-timeout 0 --port 9177",
+      "supports_only": "configured_port_claim=9177",
+      "does_not_establish": "Any bound or healthy socket."
+    },
+    "listener": {
+      "source": "lsof LISTEN evidence",
+      "evidence": "python3.1 PID 4659 jack.reis TCP 127.0.0.1:8888 (LISTEN); no LISTEN evidence was returned for port 9177",
+      "supports_only": "observed_bind_port=8888 and port_9177_listener_present=false"
+    },
+    "health": {
+      "source": "curl health probes",
+      "evidence": "Port 8888 returned {\"status\":\"healthy\",\"database\":\"connected\"}; port 9177 failed to connect with curl error 7",
+      "supports_only": "healthy_port=8888 and port_9177_health_success=false"
+    }
+  },
+  "root_cause": {
+    "verified_proximate_cause": "The effective runtime bind configuration disagrees with the visible --port 9177 process argument: the service is actually listening and healthy on 8888.",
+    "underlying_mechanism": "Not established by the preflight packet. The evidence does not determine whether hindsight-api ignores the argument, a daemon child inherits another setting, an environment or config value overrides it, or the displayed process is a supervisor rather than the socket-owning execution path.",
+    "confidence": "The port mismatch is verified; the mechanism producing it remains undetermined."
+  },
+  "runtime_impact": "Clients and monitors targeting the configured claim at 127.0.0.1:9177 cannot connect, while the Hindsight API is reachable and reports healthy at 127.0.0.1:8888. Any other expected consumer of port 8888 may also face a collision while Hindsight occupies that port.",
+  "minimal_reversible_fix_proposal": {
+    "proposal_only": true,
+    "steps": [
+      "Inspect the Hindsight launcher, daemonization path, environment, and effective configuration on Talaris to locate the source that selects port 8888.",
+      "Back up the single effective configuration or service-definition file before editing it.",
+      "Change only the effective bind-port source so the runtime binds to 127.0.0.1:9177, consistent with the existing --port 9177 argument.",
+      "Restart only the Hindsight service, then execute the verification plan before accepting the correction."
+    ],
+    "guardrail": "Do not edit or restart until the effective 8888 source is identified; the preflight alone is insufficient to name the exact file or setting."
+  },
+  "no_change_option": "Leave the service running on healthy port 8888 and record the --port 9177 argument as an inaccurate configuration claim. This avoids restart risk but preserves the mismatch and leaves all consumers expecting 9177 broken until separately reconciled.",
+  "executable_verification_plan": [
+    "ssh talaris 'hostname'",
+    "ssh talaris \"ps -p 4659 -o pid=,user=,command=\"",
+    "ssh talaris \"lsof -nP -iTCP:9177 -sTCP:LISTEN\"",
+    "ssh talaris \"lsof -nP -iTCP:8888 -sTCP:LISTEN\"",
+    "ssh talaris \"curl -fsS http://127.0.0.1:9177/health\"",
+    "ssh talaris \"if curl -fsS http://127.0.0.1:8888/health; then exit 1; else exit 0; fi\""
+  ],
+  "rollback": {
+    "trigger": "Rollback if port 9177 does not LISTEN and return a successful health response after the proposed restart, or if dependent service checks regress.",
+    "steps": [
+      "Restore the backed-up effective configuration or service definition.",
+      "Restart only the Hindsight service.",
+      "Confirm with lsof that 127.0.0.1:8888 is listening and with curl that its health endpoint again succeeds."
+    ]
+  },
+  "commands_run": [
+    "~/.codex/superpowers/.codex/superpowers-codex bootstrap",
+    "~/.codex/superpowers/.codex/superpowers-codex use-skill superpowers:using-superpowers",
+    "~/.codex/superpowers/.codex/superpowers-codex use-skill superpowers:systematic-debugging",
+    "~/.codex/superpowers/.codex/superpowers-codex use-skill superpowers:verification-before-completion",
+    "sed -n '1,260p' /Users/hermes/ringer/artifacts/talaris-memory-ports-preflight-20260715.json",
+    "pwd",
+    "rg --files -g 'AGENTS.md' -g '!hindsight-bind-correction.json' .",
+    "git status --short",
+    "date -u +%Y-%m-%dT%H:%M:%SZ",
+    "jq -e '<required-field and critical-value assertions>' hindsight-bind-correction.json",
+    "jq empty hindsight-bind-correction.json",
+    "rg -n 'configured_port_claim|observed_bind_port|healthy_port|process argument must not' hindsight-bind-correction.json",
+    "/Users/hermes/homebrew/bin/python3 -c '<manifest check with read-only SSH probes>' (blocked: sandbox denied SSH connection)",
+    "git diff -- hindsight-bind-correction.json",
+    "git status --short -- hindsight-bind-correction.json"
+  ],
+  "caveats": [
+    "The preflight packet is the evidence source of record and was collected immediately before this run.",
+    "A repeat read-only SSH verification was attempted, but the sandbox denied the SSH connection; no remote probe executed successfully in this run.",
+    "No runtime, configuration, process, listener, health endpoint, Bead, or remote host state was changed.",
+    "The packet proves the disagreement among the argument, listener, and health sources but does not prove the underlying override or daemonization mechanism.",
+    "The process argument must not be interpreted as evidence of a bound socket."
+  ]
+}

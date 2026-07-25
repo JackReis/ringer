@@ -1,0 +1,37 @@
+{
+  "run_name": "aegis-audit-batch-20260711",
+  "workdir": "/tmp/ringer-aegis-audit-20260711",
+  "max_parallel": 3,
+  "tasks": [
+    {
+      "key": "audit_health",
+      "task_type": "system-audit",
+      "engine": "codex",
+      "timeout_s": 900,
+      "expect_files": ["health-report.json"],
+      "spec": "Audit Aegis service health using real, read-only probes. Check Paperclip at http://127.0.0.1:3100/api/health, OpenBrain at http://127.0.0.1:8787/health, Hindsight at http://127.0.0.1:8888/health, and Honcho at http://127.0.0.1:8005/health. Also inspect relevant launchctl services and TCP listeners for ports 3100, 8787, 8888, and 8005. Write ./health-report.json as valid JSON containing checked_at, overall_status, and a services array. Every service entry must contain name, url, http_status, healthy, response_summary, listener_present, and launch_agent_evidence. Do not modify services or system configuration. If evidence conflicts, report degraded rather than guessing.",
+      "check": "/Users/hermes/homebrew/bin/python3 -c \"import json,sys; p='health-report.json'; d=json.load(open(p)); req={'paperclip','openbrain','hindsight','honcho'}; got={x['name'] for x in d['services']}; missing=req-got; bad=[x['name'] for x in d['services'] if x['name'] in req and (x.get('http_status')!=200 or not x.get('healthy') or not x.get('listener_present'))]; (not missing and not bad and d.get('overall_status')=='healthy') or sys.exit('FAIL: missing=%s unhealthy=%s overall=%r' % (sorted(missing),bad,d.get('overall_status'))); print('health-report verified')\"",
+      "verified": "health-report.json parses and records live HTTP 200, healthy status, and listener evidence for all four required Aegis services"
+    },
+    {
+      "key": "audit_beads",
+      "task_type": "beads-audit",
+      "engine": "codex",
+      "timeout_s": 900,
+      "expect_files": ["beads-audit.md"],
+      "spec": "Validate exactly three pending Beads from the staged read-only evidence in your current directory: hermes-wvl, hermes-9ad, and hermes-bcg. Read ready.json and each matching .txt detail file. For each Bead, verify identity, current status, priority, readiness/dependency condition, acceptance criteria quality, evidence sufficiency, blockers, and a concrete recommended next action. Distinguish ready from blocked: hermes-bcg has an explicit dependency and must not be represented as immediately executable if that dependency remains unresolved. Write ./beads-audit.md with a source/evidence section, a table covering all three IDs, individual findings, and an overall conclusion. Do not call bd with mutating commands and do not alter Bead state.",
+      "check": "test -s beads-audit.md || { echo 'FAIL: beads-audit.md missing or empty'; exit 1; }; for id in hermes-wvl hermes-9ad hermes-bcg; do grep -q \"$id\" beads-audit.md || { echo \"FAIL: missing $id\"; exit 1; }; done; grep -qiE 'blocked|dependency' beads-audit.md || { echo 'FAIL: dependency condition not analyzed'; exit 1; }; grep -qiE 'evidence|source' beads-audit.md || { echo 'FAIL: evidence provenance absent'; exit 1; }; echo 'beads-audit verified'",
+      "verified": "beads-audit.md covers all three staged pending Beads and explicitly analyzes dependency/blocker and evidence provenance"
+    },
+    {
+      "key": "test_generator",
+      "task_type": "integration-test",
+      "engine": "codex",
+      "timeout_s": 1200,
+      "expect_files": ["sync-verification.json"],
+      "spec": "Test /Users/hermes/ringer/scripts/paperclip_to_ringer_sync.py without mutating the source repository or live Paperclip. Work only in your current task directory. Copy the generator into an isolated mini-repo layout under ./fixture-repo/scripts/. Build a deterministic local fixture HTTP server that implements the two Paperclip GET endpoints used by the script and returns a small company issue/project fixture including actionable and non-actionable statuses. Run the copied generator against that fixture using PAPERCLIP_URL, PAPERCLIP_COMPANY_ID, and PAPERCLIP_SYNC_MAX_TASKS. Test both --dry-run (must write no files) and normal mode (must create registry/paperclip-fleet.json and manifests/paperclip-fleet-sync.json). Validate JSON structure, status counts, actionable selection/ranking, task cap behavior, receipt check-gates, sandbox wording, and idempotence apart from timestamp fields. Also record the discovered CLI behavior that unknown flags such as --help currently execute a real sync rather than showing help; do not run that behavior against the live source. Write ./sync-verification.json containing tested_at, source_script, fixture_summary, tests (array with name/passed/evidence), generated_artifacts, side_effect_scope, findings, and overall_pass. Any failed assertion must make overall_pass false.",
+      "check": "/Users/hermes/homebrew/bin/python3 -c \"import json,sys; d=json.load(open('sync-verification.json')); tests=d.get('tests',[]); failed=[t.get('name') for t in tests if not t.get('passed')]; arts=set(d.get('generated_artifacts',[])); need={'fixture-repo/registry/paperclip-fleet.json','fixture-repo/manifests/paperclip-fleet-sync.json'}; (d.get('overall_pass') is True and not failed and need<=arts and d.get('side_effect_scope')=='task-directory-only') or sys.exit('FAIL: overall=%r failed=%r missing_artifacts=%r scope=%r' % (d.get('overall_pass'),failed,sorted(need-arts),d.get('side_effect_scope'))); print('sync-verification verified')\"",
+      "verified": "sync-verification.json proves fixture-backed dry-run, generation, schema, ranking, cap, gate, isolation, and idempotence tests all passed"
+    }
+  ]
+}

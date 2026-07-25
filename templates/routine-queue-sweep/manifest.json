@@ -1,0 +1,43 @@
+{
+  "run_name": "{{ROUTINE_NAME}}-queue-sweep",
+  "workdir": "{{WORKDIR}}",
+  "max_parallel": 3,
+  "tasks": [
+    {
+      "key": "scan-board",
+      "task_type": "research",
+      "spec": "You are a fleet queue scanner. Query the Paperclip API for all issues assigned to the fleet agents and write a structured report to ./board-scan.json. Run: curl -sS http://127.0.0.1:3100/api/companies/87c32b8e-f131-4df8-ad8e-963d01b458e7/issues?limit=200. Parse the response and for each issue extract: id, title, status, priority, assigneeAgentId. Group by assigneeAgentId and count by status (todo, in_progress, blocked, in_review, done, cancelled). Write JSON with keys: total_issues, by_agent (object mapping agentId to {total, by_status}), unassigned (array of issue objects with no assignee), blocked_issues (array of {id, title, assigneeAgentId}). Do not modify any issue. Boundary: read-only API queries only.",
+      "check": "python3 -c \"import json; d=json.load(open('board-scan.json')); assert d.get('total_issues',0)>0, 'no issues found'; assert isinstance(d.get('by_agent'),dict), 'by_agent missing'; assert isinstance(d.get('blocked_issues'),list), 'blocked_issues missing'; print(f'board-scan OK: {d[\\\"total_issues\\\"]} issues across {len(d[\\\"by_agent\\\"])} agents')\"",
+      "expect_files": ["board-scan.json"],
+      "model": "{{MODEL}}",
+      "timeout_s": 600,
+      "verified": "board-scan.json contains a structured summary of all Paperclip issues grouped by agent and status",
+      "routine_id": "{{ROUTINE_ID}}",
+      "goal_id": "{{GOAL_ID}}"
+    },
+    {
+      "key": "stale-detection",
+      "task_type": "data-pipeline",
+      "spec": "You are a stale-issue detector. Read ./board-scan.json from your task directory. An issue is stale if its status is 'in_progress' or 'blocked' and its updatedAt field is more than 48 hours old from the current time. Write ./stale-issues.json containing an array of objects: {id, title, status, assigneeAgentId, updatedAt, hours_since_update}. If no issues are stale, write an empty array. Do not query the API — use only board-scan.json. Boundary: read board-scan.json, write stale-issues.json only.",
+      "check": "python3 -c \"import json; d=json.load(open('stale-issues.json')); assert isinstance(d,list), 'stale-issues must be a list'; print(f'stale-detection OK: {len(d)} stale issues found')\"",
+      "expect_files": ["stale-issues.json"],
+      "model": "{{MODEL}}",
+      "timeout_s": 300,
+      "verified": "stale-issues.json lists all issues that have been in_progress or blocked for more than 48 hours",
+      "routine_id": "{{ROUTINE_ID}}",
+      "goal_id": "{{GOAL_ID}}"
+    },
+    {
+      "key": "routing-recommendations",
+      "task_type": "docs",
+      "spec": "You are a fleet routing advisor. Read ./board-scan.json and ./stale-issues.json from your task directory. Write ./routing-report.md with these sections: '# Queue Sweep Routing Report', '## Board Summary' (total issues, counts by status, counts by priority), '## Stale Issues' (table of stale issues with agent, age, and suggested action), '## Routing Recommendations' (bullet list of suggested actions: reassign, unblock, escalate, close). Do not modify any issue or API state. Boundary: read the two input files, write routing-report.md only.",
+      "check": "test -s routing-report.md && grep -qiE '# Queue Sweep Routing Report' routing-report.md && grep -qiE 'Board Summary|Stale Issues|Routing Recommendations' routing-report.md && echo 'routing-report OK'",
+      "expect_files": ["routing-report.md"],
+      "model": "{{MODEL}}",
+      "timeout_s": 300,
+      "verified": "routing-report.md synthesizes board scan and stale detection into actionable routing recommendations",
+      "routine_id": "{{ROUTINE_ID}}",
+      "goal_id": "{{GOAL_ID}}"
+    }
+  ]
+}

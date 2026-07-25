@@ -1,0 +1,22 @@
+state_dir = "~/.ringer"
+dashboard_port_base = 8787
+allow_full_access = false
+
+[eval]
+backend = "jsonl"
+jsonl_path = "~/.ringer/runs.jsonl"
+
+[engines.mock]
+bin = "python3"
+args_template = [
+  "/Users/hermes/ringer/engines/mock_worker.py",
+  "{spec}",
+]
+sandbox_args = []
+full_access_args = []
+
+[artifact]
+enabled = true
+out = "~/.ringer/artifacts/{run_id}.html"
+report_out = "~/.ringer/artifacts/{run_id}-report.html"
+index_out = "~/.ringer/artifacts/index.html"

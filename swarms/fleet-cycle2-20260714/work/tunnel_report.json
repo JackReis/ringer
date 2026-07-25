@@ -1,0 +1,28 @@
+{
+  "tunnels": [
+    {
+      "name": "paperclip",
+      "launchd_loaded": true,
+      "local_port": 3110,
+      "http_status": 404,
+      "reachable": true,
+      "error": null
+    },
+    {
+      "name": "bifrost",
+      "launchd_loaded": true,
+      "local_port": 8078,
+      "http_status": 200,
+      "reachable": true,
+      "error": null
+    },
+    {
+      "name": "ringside",
+      "launchd_loaded": true,
+      "local_port": 8700,
+      "http_status": 200,
+      "reachable": true,
+      "error": null
+    }
+  ]
+}

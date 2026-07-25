@@ -1,0 +1,34 @@
+{
+  "run_name": "jac-3459-ratification",
+  "workdir": "/Users/hermes/ringer/swarms/jac-3459-ratification",
+  "max_parallel": 3,
+  "tasks": [
+    {
+      "key": "judge-spec-ratification",
+      "spec": "You are the independent spec Judge for JAC-3459. Review the deployed commit ffce4de2 of the Family Bulletin (Sandy release) on Aegis. Verify: (1) The release at ~/Projects/releases/family-bulletin/ffce4de2 contains the exact git archive of commit ffce4de2. (2) The Next.js build succeeded (BUILD_ID exists at command-centre/.next/BUILD_ID). (3) The bulletin page at /bulletin returns HTTP 200 on loopback :3032. Write your verdict to verdict-spec.json with fields {verdict: PASS|FAIL, evidence: [...], caveats: [...]}.",
+      "check": "test \"$(jq -r '.verdict' verdict-spec.json 2>/dev/null)\" = \"PASS\" && test -f verdict-spec.json && echo 'Spec Judge verdict verified'",
+      "expect_files": ["verdict-spec.json"],
+      "task_type": "persona-review",
+      "verified": "Spec Judge independently verified the deployed commit matches ffce4de2 and the bulletin page returns HTTP 200",
+      "timeout_s": 300
+    },
+    {
+      "key": "judge-security-operations",
+      "spec": "You are the independent security/operations Judge for JAC-3459. Verify the Aegis deployment security boundaries: (1) The service binds 127.0.0.1 only (not 0.0.0.0 or wildcard) on port 3032. (2) Tailscale Serve routes are tailnet-only (no funnel to internet). (3) The root handler / -> http://127.0.0.1:8700 is preserved. (4) The /family route is additive. (5) The LaunchAgent ai.family-bulletin-aegis has KeepAlive=true. Write your verdict to verdict-security.json with fields {verdict: PASS|FAIL, evidence: [...], findings: [...]}.",
+      "check": "test \"$(jq -r '.verdict' verdict-security.json 2>/dev/null)\" = \"PASS\" && test -f verdict-security.json && echo 'Security Judge verdict verified'",
+      "expect_files": ["verdict-security.json"],
+      "task_type": "persona-review",
+      "verified": "Security Judge verified loopback binding, tailnet-only routes, root handler preservation, and KeepAlive supervision",
+      "timeout_s": 300
+    },
+    {
+      "key": "typist-migration-recovery",
+      "spec": "You are the Typist for JAC-3459. Verify the event migration and recovery drill: (1) The bulletin_events table exists at ~/Library/Application Support/FamilyBulletin/bulletin-events.db with exactly 1 event (id: 1a9f2cfb-9826-40c5-8379-333d45b8613a). (2) Re-running the INSERT OR IGNORE keeps the count at 1 (idempotency). (3) A backup exists at ~/Library/Application Support/FamilyBulletin/backups/. (4) The backup/restore drill was performed (delete all, restore from backup, verify data matches). Write your findings to typist-recovery.json with fields {verdict: PASS|FAIL, event_count: N, idempotent: true|false, backup_path: '...', restore_verified: true|false}.",
+      "check": "test \"$(jq -r '.verdict' typist-recovery.json 2>/dev/null)\" = \"PASS\" && test -f typist-recovery.json && echo 'Typist recovery verdict verified'",
+      "expect_files": ["typist-recovery.json"],
+      "task_type": "code-review",
+      "verified": "Typist verified event migration idempotency, backup/restore drill, and data integrity",
+      "timeout_s": 300
+    }
+  ]
+}

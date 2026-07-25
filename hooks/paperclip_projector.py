@@ -14,8 +14,9 @@ The manifest path is optional; if omitted, the script will try to find it
 by looking for a manifest.json in the parent directory of the run state.
 
 Environment:
-    PAPERCLIP_URL  — base URL (default: http://127.0.0.1:3100)
+    PAPERCLIP_URL  — base URL (default: http://127.0.0.1:3101 on Aegis)
     BEADS_BIN      — path to bd CLI (default: bd from PATH)
+    BEADS_DIR      — authoritative Beads directory (default: ~/.beads when present)
 """
 from __future__ import annotations
 
@@ -48,14 +49,18 @@ def post_paperclip_comment(issue_id: str, body: str, base_url: str) -> dict:
         return {"error": str(e)}
 
 
-def post_beads_comment(bead_id: str, comment: str, bd_bin: str) -> str:
+def post_beads_comment(bead_id: str, comment: str, bd_bin: str, beads_dir: str) -> str:
     """Post a comment to a Beads issue. Returns the CLI output."""
     try:
+        env = os.environ.copy()
+        if beads_dir:
+            env["BEADS_DIR"] = beads_dir
         result = subprocess.run(
             [bd_bin, "comment", bead_id, comment],
             capture_output=True,
             text=True,
             timeout=30,
+            env=env,
         )
         return result.stdout.strip() or result.stderr.strip() or "(no output)"
     except Exception as e:
@@ -207,8 +212,13 @@ def main() -> int:
         print("No paperclip_issue or bead_id found in run state or manifest. Nothing to project.")
         return 0
 
-    base_url = os.environ.get("PAPERCLIP_URL", "http://127.0.0.1:3100")
+    base_url = os.environ.get("PAPERCLIP_URL", "http://127.0.0.1:3101")
     bd_bin = os.environ.get("BEADS_BIN", "bd")
+    default_beads_dir = Path.home() / ".beads"
+    beads_dir = os.environ.get(
+        "BEADS_DIR",
+        str(default_beads_dir) if default_beads_dir.is_dir() else "",
+    )
 
     results = []
 
@@ -222,7 +232,7 @@ def main() -> int:
 
         if bead_id:
             comment = format_beads_comment(run_state)
-            bd_result = post_beads_comment(bead_id, comment, bd_bin)
+            bd_result = post_beads_comment(bead_id, comment, bd_bin, beads_dir)
             results.append(f"Beads {bead_id}: {bd_result}")
             print(f"Beads {bead_id}: {bd_result}")
 

@@ -1,0 +1,17 @@
+{
+  "valid": true,
+  "prefix": "ringer-reliability-tools-20260714-1447",
+  "required_count": 1,
+  "selected_count": 1,
+  "clean_count": 1,
+  "errors": [],
+  "runs": [
+    {
+      "run_id": "ringer-reliability-tools-20260714-1447-20260714T195347Z-p58930",
+      "started_at": "2026-07-14T19:53:47.197065+00:00",
+      "clean": true,
+      "task_count": 3,
+      "reasons": []
+    }
+  ]
+}

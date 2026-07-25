@@ -1,0 +1,155 @@
+{
+  "checked_at": "2026-07-11T16:41:16.749087+00:00",
+  "overall_status": "healthy",
+  "services": [
+    {
+      "name": "paperclip",
+      "url": "http://127.0.0.1:3100/api/health",
+      "http_status": 200,
+      "healthy": true,
+      "response_summary": {
+        "status": "healthy",
+        "probe_context": "host-side read-only curl outside Codex sandbox",
+        "http_evidence": "HTTP 200",
+        "body": {
+          "status": "ok",
+          "version": "2026.626.0",
+          "deploymentMode": "local_trusted",
+          "deploymentExposure": "private",
+          "authReady": true,
+          "bootstrapStatus": "ready",
+          "bootstrapInviteActive": false,
+          "features": {
+            "companyDeletionEnabled": true
+          },
+          "serverInfo": {
+            "processStartedAt": "2026-07-11T15:15:10.449Z",
+            "git": {
+              "available": false,
+              "unavailableReason": "git_unavailable"
+            }
+          }
+        }
+      },
+      "listener_present": true,
+      "launch_agent_evidence": {
+        "summary": "LaunchAgent ai.paperclip is running with pid 73632, runs 2, and last exit code 0. lsof shows node pid 73632 listening on 127.0.0.1:3100.",
+        "labels": [
+          {
+            "label": "ai.paperclip",
+            "path": "/Users/hermes/Library/LaunchAgents/ai.paperclip.plist",
+            "state": "running",
+            "pid": 73632,
+            "program": "/Users/hermes/.hermes/node/bin/paperclipai run",
+            "runs": 2,
+            "last_exit_code": "0"
+          }
+        ],
+        "listener_evidence": "node pid 73632 user hermes TCP 127.0.0.1:3100 LISTEN"
+      }
+    },
+    {
+      "name": "openbrain",
+      "url": "http://127.0.0.1:8787/health",
+      "http_status": 200,
+      "healthy": true,
+      "response_summary": {
+        "status": "healthy",
+        "probe_context": "host-side read-only curl outside Codex sandbox",
+        "http_evidence": "HTTP 200",
+        "body": {
+          "ok": true,
+          "status": "ok",
+          "service": "aegis-local-brain",
+          "embedding_model": "mxbai-embed-large",
+          "embedding_dim": 1024
+        }
+      },
+      "listener_present": true,
+      "launch_agent_evidence": {
+        "summary": "No service-specific OpenBrain LaunchAgent was found. OrbStack/MacVirt is running with pid 409, com.hermes.orbstack-watchdog is not running with last exit code 0, and lsof shows OrbStack pid 635 listening on 127.0.0.1:8787. Docker metadata inspection was denied by the sandbox.",
+        "labels": [
+          {
+            "label": "application.dev.kdrag0n.MacVirt.1387031.1387046",
+            "state": "running",
+            "pid": 409,
+            "program": "/Applications/OrbStack.app/Contents/MacOS/OrbStack",
+            "last_exit_code": "never exited"
+          },
+          {
+            "label": "com.hermes.orbstack-watchdog",
+            "path": "/Users/hermes/Library/LaunchAgents/com.hermes.orbstack-watchdog.plist",
+            "state": "not running",
+            "program": "/bin/bash /Users/hermes/.local/bin/orbstack-watchdog.sh",
+            "runs": 683,
+            "last_exit_code": "0"
+          }
+        ],
+        "listener_evidence": "OrbStack pid 635 user hermes TCP 127.0.0.1:8787 LISTEN",
+        "docker_evidence": "docker ps failed: permission denied while trying to connect to the docker API at unix:///Users/hermes/.orbstack/run/docker.sock"
+      }
+    },
+    {
+      "name": "hindsight",
+      "url": "http://127.0.0.1:8888/health",
+      "http_status": 200,
+      "healthy": true,
+      "response_summary": {
+        "status": "healthy",
+        "probe_context": "host-side read-only curl outside Codex sandbox",
+        "http_evidence": "HTTP 200",
+        "body": {
+          "status": "healthy",
+          "database": "connected"
+        }
+      },
+      "listener_present": true,
+      "launch_agent_evidence": {
+        "summary": "LaunchAgent com.hermes.hindsight-api is running with pid 746, runs 1, and has never exited. lsof shows python3.1 pid 746 listening on 127.0.0.1:8888.",
+        "labels": [
+          {
+            "label": "com.hermes.hindsight-api",
+            "path": "/Users/hermes/Library/LaunchAgents/com.hermes.hindsight-api.plist",
+            "state": "running",
+            "pid": 746,
+            "program": "/bin/bash -c set -a && source /Users/hermes/.hindsight/profiles/hermes.env && set +a && exec /Users/hermes/.hindsight-hermes-venv/bin/hindsight-api --host 127.0.0.1 --port 8888 --log-level info",
+            "runs": 1,
+            "last_exit_code": "never exited"
+          }
+        ],
+        "listener_evidence": "python3.1 pid 746 user hermes TCP 127.0.0.1:8888 LISTEN"
+      }
+    },
+    {
+      "name": "honcho",
+      "url": "http://127.0.0.1:8005/health",
+      "http_status": 200,
+      "healthy": true,
+      "response_summary": {
+        "status": "healthy",
+        "probe_context": "host-side read-only curl outside Codex sandbox",
+        "http_evidence": "HTTP 200",
+        "body": {
+          "status": "ok"
+        }
+      },
+      "listener_present": true,
+      "launch_agent_evidence": {
+        "summary": "LaunchAgent com.hermes.honcho-local is spawn scheduled with active count 0, runs 7731, and last exit code 1. lsof still shows OrbStack pid 635 listening on 127.0.0.1:8005 and 100.84.253.97:8005. Docker metadata inspection was denied by the sandbox.",
+        "labels": [
+          {
+            "label": "com.hermes.honcho-local",
+            "path": "/Users/hermes/Library/LaunchAgents/com.hermes.honcho-local.plist",
+            "state": "spawn scheduled",
+            "active_count": 0,
+            "program": "/usr/local/bin/docker compose -p honcho-hermes-aegis -f /Users/hermes/ai-dev/honcho-dev/docker-compose.aegis.yml up -d",
+            "runs": 7731,
+            "last_exit_code": "1"
+          }
+        ],
+        "listener_evidence": "OrbStack pid 635 user hermes TCP 127.0.0.1:8005 LISTEN and TCP 100.84.253.97:8005 LISTEN",
+        "docker_evidence": "docker ps failed: permission denied while trying to connect to the docker API at unix:///Users/hermes/.orbstack/run/docker.sock"
+      }
+    }
+  ]
+}

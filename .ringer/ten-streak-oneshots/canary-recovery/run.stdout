@@ -1,0 +1,19 @@
+mock-worker: wrote 1 file(s): probe.py
+mock-worker: wrote 1 file(s): probe.py
+mock-worker: wrote 1 file(s): probe.py
+mock-worker: wrote 1 file(s): probe.py
+
+Summary
+run_id: exact-prompt-canary-20260714T214505Z-20260714T214506Z-p28713
+task                     status   verdict  attempts     tokens  elapsed_s
+-------------------------------------------------------------------------
+aegis-control-plane      pass     PASS            1                   0.1
+talaris-cross-host       pass     PASS            1                   1.0
+canonical-work-state     pass     PASS            1                   1.6
+owned-ringer-fork        pass     PASS            1                   1.0
+Model log updated; run './ringer.py models' for the per-model scoreboard.
+
+Your results: /Users/hermes/.ringer/artifacts/live/exact-prompt-canary-20260714T214505Z.html
+Open it in a browser, or run './ringer.py hud' for the full Ringside view (http://127.0.0.1:8700).
+Paperclip JAC-3415: ok
+Beads hermes-ujgu: ✓ Comment added to hermes-ujgu — Stabilize fleet through 10 consecutive clean Ringer runs

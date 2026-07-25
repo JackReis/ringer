@@ -27,6 +27,17 @@ if [ "${1:-}" = "--no-sandbox" ]; then SANDBOX=0; shift; fi
 # Export before either execution path so sandboxed and full-access runs agree.
 export OPENCODE_DISABLE_CLAUDE_CODE=1
 
+# Inject cloud provider API keys for OpenCode's ollama-cloud and xai providers.
+# The cloud-keys.env file is chmod 600 and holds OLLAMA_API_KEY and XAI_API_KEY.
+# If the file is absent or keys are missing, OpenCode falls back to local Ollama.
+CLOUD_KEYS_ENV="${CLOUD_KEYS_ENV:-$HOME/.config/ringer/cloud-keys.env}"
+if [ -f "$CLOUD_KEYS_ENV" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$CLOUD_KEYS_ENV"
+  set +a
+fi
+
 # Resolve opencode without tripping `set -e` (command -v returns nonzero when absent).
 if ! OPENCODE_BIN="$(command -v opencode)" || [ -z "$OPENCODE_BIN" ]; then
   echo "opencode-sandboxed.sh: opencode not found on PATH" >&2

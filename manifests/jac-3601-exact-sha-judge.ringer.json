@@ -1,0 +1,41 @@
+{
+  "run_name": "jac-3601-exact-sha-judge-verification",
+  "workdir": "/Users/hermes/Projects/herdr-tg-bridge-source/.paperclip/worktrees/JAC-3645-luna-recovery",
+  "max_parallel": 1,
+  "risk": "medium",
+  "orchestrator": {
+    "provider": "ollama-cloud",
+    "model": "deepseek-v4-flash",
+    "family": "deepseek-v4",
+    "runtime": "hermes_local",
+    "attestation": "Analyst-Opus JAC-3601 exact-SHA Judge"
+  },
+  "tasks": [
+    {
+      "key": "verify-exact-sha",
+      "task_type": "verification",
+      "engine": "codex",
+      "model": "gpt-5.4-mini",
+      "timeout_s": 300,
+      "paperclip_issue": "JAC-3577",
+      "bead_id": "notes-0izpo",
+      "spec": "Verify the exact SHA at HEAD of this worktree matches the immutable SHA claimed by JAC-3600: d8b6bcd3d26c90d4d7de6de0104c03e69cd05675. Confirm the commit message is 'feat(jac-3645): red-green TDD for all eight Judge adjudication points'. Report SHA MATCH or SHA MISMATCH.",
+      "check": "set -eu; ACTUAL=$(git rev-parse HEAD); EXPECTED='d8b6bcd3d26c90d4d7de6de0104c03e69cd05675'; if [ \"$ACTUAL\" != \"$EXPECTED\" ]; then echo \"FAIL: SHA MISMATCH — expected $EXPECTED, got $ACTUAL\"; exit 1; fi; echo \"PASS: SHA MATCH — $ACTUAL\"; COMMIT_MSG=$(git log -1 --pretty=%s); EXPECTED_MSG='feat(jac-3645): red-green TDD for all eight Judge adjudication points'; if [ \"$COMMIT_MSG\" != \"$EXPECTED_MSG\" ]; then echo \"FAIL: commit message mismatch — expected '$EXPECTED_MSG', got '$COMMIT_MSG'\"; exit 1; fi; echo \"PASS: commit message matches\"; echo \"PASS: exact SHA verification complete\"",
+      "expect_files": ["/tmp/jac-3601-sha-verification.txt"],
+      "verified": "exact SHA d8b6bcd3d26c90d4d7de6de0104c03e69cd05675 verified at HEAD with matching commit message"
+    },
+    {
+      "key": "verify-eight-judge-points",
+      "task_type": "verification",
+      "engine": "codex",
+      "model": "gpt-5.4-mini",
+      "timeout_s": 300,
+      "paperclip_issue": "JAC-3577",
+      "bead_id": "notes-0izpo",
+      "spec": "Run the full test suite for all eight Judge adjudication points from tests/test_jac3645_adjudication.py. Report the exact count of passed/failed tests. All 33 tests across 8 Judge points must pass: Point 1 (Catalog exact match), Point 2 (Footer authentication), Point 3 (Working transition), Point 4 (Deadline enforcement), Point 5 (Cleanup escape), Point 6 (Continuity), Point 7 (Size cap), Point 8 (Failure receipt).",
+      "check": "set -eu; python3 -m pytest tests/test_jac3645_adjudication.py -v 2>&1 | tee /tmp/jac-3601-test-output.txt; TOTAL=$(grep -c 'PASSED' /tmp/jac-3601-test-output.txt || true); FAILED=$(grep -c 'FAILED' /tmp/jac-3601-test-output.txt || true); ERRORS=$(grep -c 'ERROR' /tmp/jac-3601-test-output.txt || true); if [ \"$FAILED\" -gt 0 ] || [ \"$ERRORS\" -gt 0 ]; then echo \"FAIL: $FAILED failed, $ERRORS errors out of $TOTAL total tests\"; exit 1; fi; if [ \"$TOTAL\" -lt 33 ]; then echo \"FAIL: expected 33 tests, got $TOTAL\"; exit 1; fi; echo \"PASS: all $TOTAL tests passed across 8 Judge points\"; echo \"=== Point coverage ===\"; grep -E '^(tests/)?test_' /tmp/jac-3601-test-output.txt | grep -E 'PASSED|FAILED' | sed 's/.*::/  /' | sed 's/ PASSED/ ✓/' | sed 's/ FAILED/ ✗/'",
+      "expect_files": ["/tmp/jac-3601-test-output.txt"],
+      "verified": "all 33 tests across 8 Judge adjudication points pass on exact SHA d8b6bcd"
+    }
+  ]
+}

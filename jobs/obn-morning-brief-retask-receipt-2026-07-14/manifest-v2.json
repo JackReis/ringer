@@ -1,0 +1,19 @@
+{
+  "run_name": "obn-morning-brief-retask-receipt-v2-2026-07-14",
+  "workdir": "/Users/hermes/ringer/jobs/obn-morning-brief-retask-receipt-2026-07-14/work-v2",
+  "max_parallel": 1,
+  "tasks": [
+    {
+      "key": "verify-observability-receipt",
+      "task_type": "probe",
+      "engine": "mock",
+      "timeout_s": 180,
+      "paperclip_issue": "JAC-3414",
+      "bead_id": "notes-sbry1",
+      "expect_files": ["receipt.md"],
+      "verified": "Live checks confirm the OBn morning brief cron is no-agent and Kimi-free, with cross-linked Beads, Paperclip, Bifrost, and ContextForge receipts.",
+      "spec": "Create one receipt artifact for the already-completed OBn morning brief cron retask. The executed verifier—not this worker's statement—will check the live cron on Talaris, Beads notes-sbry1, Paperclip JAC-3414, Bifrost row 9fa201ba-ad61-4db4-847a-cfc9dcbbc7e0, and ContextForge pointer dec71bf8-9b04-425c-abb7-3b21758f062b.\n\nMOCK_FILE: receipt.md\n# OBn Morning Brief Retask — Fleet Observability Receipt\n\n- Correlation: `obn-morning-brief-retask-20260714`\n- Beads SSOT: `notes-sbry1`\n- Paperclip mirror: `JAC-3414` (`01747674-479d-4c3b-ace4-5382b50ec8e6`)\n- Bifrost telemetry row: `9fa201ba-ad61-4db4-847a-cfc9dcbbc7e0`\n- ContextForge pointer: `dec71bf8-9b04-425c-abb7-3b21758f062b`\n- Cron: `da8ad7b5c684` / `obn-morning-brief.sh` / `no_agent=true`\n\nVerified: live downstream checks must pass before this receipt is accepted.\nMOCK_END",
+      "check": "python3 /Users/hermes/ringer/jobs/obn-morning-brief-retask-receipt-2026-07-14/verify_receipt.py receipt.md"
+    }
+  ]
+}

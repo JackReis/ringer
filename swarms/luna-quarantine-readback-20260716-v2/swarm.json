@@ -1,0 +1,26 @@
+{
+  "schema_version": 3,
+  "run_name": "luna-quarantine-readback-20260716-v2",
+  "workdir": "/private/tmp/ringer-luna-quarantine-readback-20260716-v2",
+  "max_parallel": 1,
+  "worktrees": false,
+  "default_engine": "codex",
+  "identity": "aegis",
+  "tasks": [
+    {
+      "key": "independent-quarantine-audit-v2",
+      "task_type": "code-review",
+      "engine": "codex",
+      "model": "gpt-5.5",
+      "engine_args": ["-c", "model_reasoning_effort=medium"],
+      "timeout_s": 480,
+      "full_access": false,
+      "spec": "Act as an independent read-only governance auditor. Read only ../snapshot.json and write exactly one file, luna-quarantine-audit-v2.md, in the current task directory. Do not modify Paperclip, Beads, git, services, credentials, OAuth state, Herdr, listeners, or host configuration. The snapshot records the immutable predecessor failure and its cause; preserve that failure honestly rather than relabeling it. Evaluate these captured invariants: Luna High Planner adapterConfig.provider must equal copilot and adapterConfig.model must equal gpt-5.6-luna; JAC-3592, JAC-3593, JAC-3594, and JAC-3595 must each be blocked, unassigned, and executionRunId=null; JAC-3622, JAC-3608, JAC-3617, and JAC-3603 must each be blocked/done/cancelled with executionRunId=null; JAC-3626 must be done with executionRunId=null. If JAC-3609 or JAC-3626 is in_progress or has a non-null executionRunId, verdict must be SAFE_HOLD, because an authorized policy/auth gate is still active. Otherwise verdict may be TERMINAL_PASS for the quarantine only. Any failed invariant requires UNSAFE. Include sections Snapshot Provenance, Predecessor Failure, Invariant Matrix, Stale Lane Analysis, Active Run Analysis, Fail-Closed Decision, and Exact Next Gate. Cite exact captured statuses, assignees, run IDs, adapter fields, and timestamps. Make clear that task PASS is evidence production only, never implementation authorization. End with READ_ONLY.",
+      "check": "set -eu; f=luna-quarantine-audit-v2.md; if [ ! -s \"$f\" ]; then echo 'FAIL: luna-quarantine-audit-v2.md missing or empty' >&2; exit 1; fi; for term in 'Snapshot Provenance' 'Predecessor Failure' 'Invariant Matrix' 'Stale Lane Analysis' 'Active Run Analysis' 'Fail-Closed Decision' 'Exact Next Gate' 'READ_ONLY'; do if ! grep -Fq -- \"$term\" \"$f\"; then printf 'FAIL: audit missing required phrase: %s\\n' \"$term\" >&2; exit 1; fi; done; bytes=$(wc -c < \"$f\" | tr -d ' '); if [ \"$bytes\" -lt 2500 ]; then printf 'FAIL: audit too small: %s bytes\\n' \"$bytes\" >&2; exit 1; fi; python3 -c 'import json; d=json.load(open(\"../snapshot.json\")); r=open(\"luna-quarantine-audit-v2.md\").read(); by={x[\"identifier\"]:x for x in d[\"issues\"]}; a=d[\"agents\"][0]; assert a[\"adapterConfig\"][\"provider\"]==\"copilot\", \"Luna provider drift\"; assert a[\"adapterConfig\"][\"model\"]==\"gpt-5.6-luna\", \"Luna model drift\"; assert all(by[i][\"status\"]==\"blocked\" and by[i][\"assigneeAgentId\"] is None and by[i][\"executionRunId\"] is None for i in (\"JAC-3592\",\"JAC-3593\",\"JAC-3594\",\"JAC-3595\")), \"implementation quarantine invariant failed\"; assert all(by[i][\"status\"] in (\"blocked\",\"done\",\"cancelled\") and by[i][\"executionRunId\"] is None for i in (\"JAC-3622\",\"JAC-3608\",\"JAC-3617\",\"JAC-3603\")), \"stale lane quarantine invariant failed\"; assert by[\"JAC-3626\"][\"status\"]==\"done\" and by[\"JAC-3626\"][\"executionRunId\"] is None, \"Wings quarantine action not terminal\"; active=any(by[i][\"status\"]==\"in_progress\" or by[i][\"executionRunId\"] is not None for i in (\"JAC-3609\",\"JAC-3626\")); expected=\"SAFE_HOLD\" if active else \"TERMINAL_PASS\"; assert expected in r, \"report verdict does not match captured active-run state: expected \"+expected; print(\"SNAPSHOT_CHECK=PASS expected_verdict=\"+expected)'; printf 'EXECUTED_CHECK=PASS luna-quarantine-audit-v2 bytes=%s\\n' \"$bytes\"",
+      "expect_files": ["luna-quarantine-audit-v2.md"],
+      "verified": "The audit validates exact model policy, implementation quarantine, stale-lane quarantine, Wings closeout, and a snapshot-derived fail-closed verdict without mutating fleet state.",
+      "paperclip_issue": "JAC-3625",
+      "bead_id": "hermes-klxo.2"
+    }
+  ]
+}

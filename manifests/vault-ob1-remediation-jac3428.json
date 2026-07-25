@@ -1,0 +1,51 @@
+{
+  "run_name": "vault-ob1-remediation-jac3428",
+  "workdir": "/tmp/ringer-vault-ob1-remediation",
+  "max_parallel": 4,
+  "tasks": [
+    {
+      "key": "phase1-link-fixes",
+      "task_type": "docs",
+      "engine": "codex",
+      "model": "gpt-5.5",
+      "timeout_s": 600,
+      "expect_files": ["receipt_phase1-links.md"],
+      "spec": "You are a vault maintenance worker for the OKF Vault at /Users/hermes/Vault. Your job: fix broken wiki links in the vault. Specifically:\n\n1. Create /Users/hermes/Vault/fleet/topology.md with a fleet topology doc referencing the Tailscale network (Aegis at 100.84.253.97, Talaris at 100.97.178.76), port registry (Bifrost :8078, Paperclip :3100, Ringside :8700, OB1 :8787, Hindsight :8888, Honcho :8005, Ollama :11434), and host roles.\n2. Create /Users/hermes/Vault/fleet/audit.md as a redirect stub pointing to audit/index.md.\n3. Create /Users/hermes/Vault/audit.md as a redirect stub pointing to audit/index.md.\n4. Fix canon.md: change the link target from 'OKF%20Audit%20Report.md' to 'OKF Audit Report.md' (the file exists with a space in the name, not URL-encoded).\n5. Do NOT modify any audit/ files — those are historical records with intentionally broken links.\n\nAll new files must have YAML frontmatter with type, title, status, resource, timestamp fields. Use status: active for new content, status: redirect for stubs.\n\nWhen done, write ./receipt_phase1-links.md with: (1) what you did, (2) exact paths of files created/modified, (3) verification that links now resolve, (4) any caveats.",
+      "check": "test -s receipt_phase1-links.md && test -f /Users/hermes/Vault/fleet/topology.md && test -f /Users/hermes/Vault/fleet/audit.md && test -f /Users/hermes/Vault/audit.md && grep -qiE 'verif|verified|check|test|resolved' receipt_phase1-links.md && echo 'Phase 1 link fixes OK'",
+      "verified": "fleet/topology.md, fleet/audit.md, audit.md created; canon.md link fixed; receipt documents verification"
+    },
+    {
+      "key": "phase2-storage-research",
+      "task_type": "research",
+      "engine": "codex",
+      "model": "gpt-5.5",
+      "timeout_s": 900,
+      "expect_files": ["storage-decision.md"],
+      "spec": "You are a research worker evaluating storage options for the Agentic OS Fleet knowledge base at /Users/hermes/Vault. Write a decision document at ./storage-decision.md evaluating three options against the fleet's criteria (simplicity, local-first, offline capability, audit logging, integration with Aegis/Hermes):\n\n1. Pinecone (hosted vector DB)\n2. Prisma + SQLite/Postgres (ORM layer)\n3. Vault MD + HTML (pure file-based)\n\nContext: The vault is an OKF-compliant Obsidian vault. Aegis is a Mac Mini running Hermes, Codex, Claude Code. OB1 (Postgres+pgvector at :8787) is currently healthy but the plan is to standardize onto Aegis. The fleet values local-first infrastructure and minimal external dependencies.\n\nInclude a recommendation with justification. The recommendation should account for: semantic search needs (OB1 currently provides this via pgvector), conversation logging (currently SQLite), and the fleet's preference for local-first tools.\n\nWhen done, write ./storage-decision.md with a '# Storage Decision' header, '## Evaluation' section covering all three options, '## Recommendation' section with a clear choice, and '## Migration Notes' section.",
+      "check": "test -s storage-decision.md && grep -q '## Recommendation' storage-decision.md && grep -qiE 'pinecone|prisma|vault.md' storage-decision.md && echo 'Storage research OK'",
+      "verified": "storage-decision.md exists, evaluates all three options, and includes a recommendation"
+    },
+    {
+      "key": "phase4-ob1-assessment",
+      "task_type": "research",
+      "engine": "codex",
+      "model": "gpt-5.5",
+      "timeout_s": 600,
+      "expect_files": ["ob1-assessment.md"],
+      "spec": "You are an infrastructure assessment worker. Assess the current state of OB1 (Open Brain 1) on Aegis for the standardization plan.\n\nCheck the following and document in ./ob1-assessment.md:\n1. Is OB1 running? Check http://127.0.0.1:8787/health via curl.\n2. What Docker containers are running for OB1? Run: docker ps --filter name=ob1 --format '{{.Names}} {{.Status}} {{.Ports}}'\n3. What Hermes configs reference OB1? Check ~/.hermes/ for OPENBRAIN_URL or openbrain references.\n4. What MCP bridge scripts exist? Check for openbrain-mcp-wrapper.sh and openbrain-mcp-bridge.py.\n5. How many thoughts are stored? Try: curl -sS http://127.0.0.1:8787/thoughts | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d) if isinstance(d,list) else d)'\n\nDocument findings and provide a safe shutdown procedure. Do NOT shut anything down — this is assessment only.\n\nWrite ./ob1-assessment.md with '# OB1 Assessment' header, '## Current State', '## Dependencies', '## Shutdown Procedure', and '## Risk Assessment' sections.",
+      "check": "test -s ob1-assessment.md && grep -q '## Current State' ob1-assessment.md && grep -q '## Shutdown Procedure' ob1-assessment.md && echo 'OB1 assessment OK'",
+      "verified": "ob1-assessment.md exists with current state and shutdown procedure sections"
+    },
+    {
+      "key": "phase5-compliance-check",
+      "task_type": "docs",
+      "engine": "codex",
+      "model": "gpt-5.5",
+      "timeout_s": 600,
+      "expect_files": ["compliance-report.md"],
+      "spec": "You are a compliance checker for the OKF Vault at /Users/hermes/Vault. Run a link audit and frontmatter check.\n\n1. Check all markdown files for broken wiki links (excluding audit/ directory which has historical broken links). Use Python:\n   - For each .md file (excluding audit/), find [text](link.md) references where the target doesn't exist.\n   - Report only non-audit broken links.\n\n2. Check all .md files for YAML frontmatter (--- at start). Report files missing frontmatter.\n\n3. Check all index.md files have frontmatter.\n\nWrite ./compliance-report.md with:\n- '# Compliance Report'\n- '## Broken Links' (non-audit only)\n- '## Missing Frontmatter'\n- '## Summary' with a compliance score (percentage of files with frontmatter, percentage of links working)\n- '## Recommendations'\n\nDo NOT modify any files. This is a read-only audit.",
+      "check": "test -s compliance-report.md && grep -q '## Summary' compliance-report.md && grep -qiE 'compliance|score|percent' compliance-report.md && echo 'Compliance check OK'",
+      "verified": "compliance-report.md exists with broken links, missing frontmatter, and a compliance score"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "verdict": "PASS",
+  "evidence": [
+    "Fresh socket check: `lsof -nP -iTCP:3032 -sTCP:LISTEN` shows `node` listening on `TCP 127.0.0.1:3032 (LISTEN)` only; no `0.0.0.0`, `*`, or wildcard listener was present for port 3032.",
+    "Fresh LaunchAgent plist check: `/Users/hermes/Library/LaunchAgents/ai.family-bulletin-aegis.plist` has `ProgramArguments` ending in `start -H 127.0.0.1`, `EnvironmentVariables.PORT=3032`, `WorkingDirectory=/Users/hermes/Projects/releases/family-bulletin/ffce4de2/command-centre`, and `KeepAlive => true`.",
+    "Fresh launchd state check: `launchctl print gui/501/ai.family-bulletin-aegis` reports `state = running`, `PORT => 3032`, arguments `-H 127.0.0.1`, and `properties = keepalive | inferred program`.",
+    "Fresh service log check: `/Users/hermes/Library/Logs/AgenticOS/ai.family-bulletin-aegis.out.log` reports Next.js ready with both `Local` and `Network` URLs set to `http://127.0.0.1:3032`.",
+    "Root handler preservation evidence: `/Users/hermes/Library/Application Support/FamilyBulletin/.tailscale-serve-backup.json` records the pre-additive Tailscale Serve root handler `/ -> http://127.0.0.1:8700` for `aegis.tailc2f398.ts.net:443`.",
+    "Additive route evidence: `/Users/hermes/Projects/agentic-os/scripts/family-bulletin-deploy.sh` backs up existing Serve config, reads the root handler, adds only `/family -> http://127.0.0.1:${PORT}` using `tailscale serve --set-path` or `--path`, and verifies the root handler after adding `/family`.",
+    "No Funnel configuration path was found in the deployment script; the route setup uses `tailscale serve` and does not call `tailscale funnel`.",
+    "Adjacent JAC-3459 spec verdict records operator/outside-sandbox verification that `http://127.0.0.1:3032/bulletin` returned HTTP 200 and that Tailscale Serve `/family` proxies to `127.0.0.1:3032` and returns HTTP 200.",
+    "Existing JAC-3459 security verdict evidence, created before the worker timeout, records no Tailscale Funnel configured, tailnet-only `https://aegis.tailc2f398.ts.net`, direct tailnet IP access to `100.84.253.97:3032` refused, `/family` and `/family/bulletin` returning HTTP 200 via Tailscale Serve, and route preservation after restart."
+  ],
+  "findings": [
+    "PASS: the requested service boundary is loopback-only on port 3032, with both socket state and launchd configuration agreeing on `127.0.0.1`.",
+    "PASS: `ai.family-bulletin-aegis` is supervised with `KeepAlive=true` and is currently loaded/running under launchd.",
+    "PASS: root Tailscale Serve handler preservation and additive `/family` routing are supported by the saved Serve backup, deployment script semantics, and adjacent JAC-3459 operator verification.",
+    "PASS: no evidence of Funnel exposure was found in the deployment path, and the prior security verdict from this ratification run recorded no configured Funnel and refused direct tailnet-IP access to port 3032.",
+    "Judge sandbox limitation: current direct `curl`/`nc` loopback probes and `tailscale serve/funnel status` calls are blocked from this Codex sandbox (`Operation not permitted` for local connects; `Failed to load preferences` from the Tailscale CLI). These blocked probes were not treated as negative deployment evidence.",
+    "Non-blocking operational note: the service stderr contains recurring `better-sqlite3` binding errors from `cron-task-sync`, but that does not affect the five requested security boundary checks."
+  ]
+}

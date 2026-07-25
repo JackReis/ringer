@@ -1,0 +1,27 @@
+{
+  "checked_at": "2026-07-14T21:52:52Z",
+  "source_host": "talaris",
+  "source_path": "/Users/jack.reis/Documents/=notes",
+  "schema_version": 1,
+  "summary": {
+    "total_issues": 1260,
+    "closed_issues": 1030,
+    "open_issues": 97,
+    "in_progress_issues": 26,
+    "blocked_issues": 13,
+    "deferred_issues": 85,
+    "ready_issues": 84
+  },
+  "evidence_safe_actions": [],
+  "human_gated_examples": [
+    "Any claim, close, sync, push, or status mutation against authoritative Talaris Beads remains human-gated unless a live row shows duplicate status, an explicit test probe, or executable completion evidence.",
+    "Ready-looking work remains human-gated when it lacks evidence-safe proof from issue rows, even when aggregate authoritative Talaris Beads counts are present."
+  ],
+  "contradictions": [
+    "This worker attempted the required read-only Talaris commands, bd status --json, bd stats --json, and bd list --json, but ssh talaris failed with: ssh: connect to host 100.97.178.76 port 22: Operation not permitted.",
+    "The previous source/diff/schema failure supplied the authoritative Talaris Beads aggregate counts used here, but no live bd list rows were readable in this sandbox.",
+    "Aegis-local Beads were not queried or used as task truth.",
+    "No issue-level duplicate rows, explicit test probes, or executable completion evidence were available here, so evidence_safe_actions is intentionally empty."
+  ],
+  "recommendation": "Treat this as an authoritative Talaris Beads aggregate report with no evidence-safe action queue. Keep ambiguous work human-gated, and rerun the same read-only bd status, bd stats, and bd list checks from an environment allowed to reach ssh talaris before adding any issue-level recommendations."
+}

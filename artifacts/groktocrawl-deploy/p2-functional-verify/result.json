@@ -1,0 +1,17 @@
+{
+  "scrape": {
+    "ok": true,
+    "detail": "POST /v2/scrape returned markdown containing 'Example Domain' (len 167)"
+  },
+  "search": {
+    "ok": true,
+    "detail": "POST /v2/search (Brave/SlopSearX) returned 3 web hits for query 'test'"
+  },
+  "answer": {
+    "ok": false,
+    "detail": "POST /v2/answer returned 'LLM API returned 503'. Root cause: shared Aegis-local Ollama chat lane (qwen3-coder:30b @ port 60879) is wedged/contended — direct /api/generate and /v1/chat/completions both time out >180s and return 'server busy, maximum pending requests exceeded'. Ollama runs -np 1 (single request slot) and another active fleet agent (Aegis hermes_local worker PID 35620, issue JAC-3725) is consuming the chat lane. Cloud LLM fallback keys (OPENAI_API_KEY invalid_api_key; OPENROUTER_API_KEY 401) in ~/.hermes/.env are stale/invalid, so no cloud fallback is available.",
+    "blocker": "LLM answer lane unavailable"
+  },
+  "status": "FAIL",
+  "note": "P2_OK NOT written — answer sub-check failed on LLM lane. Gate not bypassed per manifest rule."
+}

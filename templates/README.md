@@ -21,6 +21,9 @@ A kit is a reusable Ringer starter: a manifest skeleton, check skeletons, and a 
 | `competitive-teardown` | Runs N scouts by competitor with verbatim-citation allowlist checks and a synthesis phase. | You need grounded competitor analysis with traceable source material. | Blueprint |
 | `data-pipeline` | Splits fetch, transform, and validate stages with executed validators and honesty rules. | You need a data workflow that proves each stage produced what it claims. | Blueprint |
 | `probe` | Provides a one-task manifest for smokes, probes, and post-mortems. | You need a visible, logged check before trusting a new engine, model, harness, or diagnosis. | Proven as a practice |
+| `routine-fanout` | Wires a Ringer swarm's verdicts back to a Paperclip Routine's active issue and linked goal. | A Paperclip Routine fires and the work decomposes into parallel tasks with auto-projection. | Blueprint |
+| `routine-health-check` | Probes fleet API, memory, and infrastructure layers in parallel, synthesizes a PASS/FAIL health report. | A Paperclip Routine monitors fleet health on a schedule with executed checks. | Blueprint |
+| `routine-queue-sweep` | Scans the Paperclip board, detects stale issues, generates routing recommendations. | A Paperclip Routine reviews the fleet task queue and needs structured data for routing decisions. | Blueprint |
 
 ## Kit Anatomy
 
@@ -33,6 +36,8 @@ Standard kit files are `manifest.json`, `README.md`, and usually one or more exe
 - `asset-swarm` lanes drop into any kit that needs media: images, animations, diagrams, and captures can be validated as task outputs.
 - `probe` is the pre-flight for any new engine or model: prove the harness path once before giving it a real batch.
 - `repo-feature` is the delivery lane after research kits decide what to build: keep discovery separate from repo mutation.
+- `routine-fanout` wires any swarm to a Paperclip Routine: lift its cross-reference fields onto any kit's tasks to get auto-projection.
+- `routine-health-check` and `routine-queue-sweep` compose into a full fleet monitoring routine: health probes + board scan + routing report.
 
 ## Craft Floor
 

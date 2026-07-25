@@ -1,0 +1,318 @@
+{
+  "tested_at": "2026-07-11T16:37:26.231540+00:00",
+  "source_script": "/Users/hermes/ringer/scripts/paperclip_to_ringer_sync.py",
+  "fixture_summary": {
+    "company_id": "fixture-company-001",
+    "projects": 2,
+    "issues": 9,
+    "status_counts": {
+      "todo": 2,
+      "in_progress": 2,
+      "in_review": 1,
+      "blocked": 1,
+      "done": 1,
+      "canceled": 1,
+      "unknown": 1
+    },
+    "actionable_statuses": [
+      "blocked",
+      "in_progress",
+      "in_review",
+      "todo"
+    ],
+    "actionable_issue_count": 6,
+    "expected_actionable_order": [
+      "PC-102",
+      "PC-103",
+      "PC-104",
+      "PC-106",
+      "PC-101",
+      "PC-105"
+    ],
+    "sync_max_tasks": 4,
+    "served_endpoints": [
+      "GET /api/companies/fixture-company-001/projects",
+      "GET /api/companies/fixture-company-001/issues?limit=500&offset=0"
+    ],
+    "transport": {
+      "mode": "http_listener",
+      "listener_started": true,
+      "bind_error": null,
+      "base_url": "http://127.0.0.1:64150"
+    }
+  },
+  "tests": [
+    {
+      "name": "source copied into isolated fixture repo",
+      "passed": true,
+      "evidence": {
+        "source_script": "/Users/hermes/ringer/scripts/paperclip_to_ringer_sync.py",
+        "copied_script": "fixture-repo/scripts/paperclip_to_ringer_sync.py",
+        "byte_identical": true,
+        "copied_sha256": "06f878be3acc7ece79bb99df43c5c4f7f860a2803cec86ceaa57d9cceff07068"
+      }
+    },
+    {
+      "name": "dry-run writes no registry or manifest files",
+      "passed": true,
+      "evidence": {
+        "returncode": 0,
+        "stdout_lines": [
+          "Paperclip -> Ringer sync @ 2026-07-11T16:37:25.577043+00:00",
+          "  company=jack.digital  projects=2  issues=9  actionable=6",
+          "  by_status={'todo': 2, 'in_progress': 2, 'in_review': 1, 'blocked': 1, 'done': 1, 'canceled': 1, 'unknown': 1}",
+          "  manifest tasks=4  (DROPPED 2 beyond MAX_TASKS=4 \u2014 raise PAPERCLIP_SYNC_MAX_TASKS to include)",
+          "  [dry-run] no files written"
+        ],
+        "stderr_lines": [],
+        "request_count": 2,
+        "registry_exists": false,
+        "manifest_exists": false,
+        "paths_checked": [
+          "fixture-repo/registry/paperclip-fleet.json",
+          "fixture-repo/manifests/paperclip-fleet-sync.json"
+        ]
+      }
+    },
+    {
+      "name": "normal mode creates both JSON artifacts",
+      "passed": true,
+      "evidence": {
+        "returncode": 0,
+        "stdout_lines": [
+          "Paperclip -> Ringer sync @ 2026-07-11T16:37:25.623266+00:00",
+          "  company=jack.digital  projects=2  issues=9  actionable=6",
+          "  by_status={'todo': 2, 'in_progress': 2, 'in_review': 1, 'blocked': 1, 'done': 1, 'canceled': 1, 'unknown': 1}",
+          "  manifest tasks=4  (DROPPED 2 beyond MAX_TASKS=4 \u2014 raise PAPERCLIP_SYNC_MAX_TASKS to include)",
+          "  wrote registry/paperclip-fleet.json",
+          "  wrote manifests/paperclip-fleet-sync.json"
+        ],
+        "stderr_lines": [],
+        "request_count": 2,
+        "registry": "fixture-repo/registry/paperclip-fleet.json",
+        "manifest": "fixture-repo/manifests/paperclip-fleet-sync.json"
+      }
+    },
+    {
+      "name": "registry and manifest JSON structure is valid",
+      "passed": true,
+      "evidence": {
+        "registry_keys": [
+          "actionable_issues",
+          "doctrine",
+          "projects",
+          "source",
+          "synced_at",
+          "totals"
+        ],
+        "manifest_keys": [
+          "_doctrine",
+          "_source",
+          "_synced_at",
+          "max_parallel",
+          "run_name",
+          "tasks",
+          "workdir"
+        ],
+        "source_url_is_fixture": true
+      }
+    },
+    {
+      "name": "status counts include actionable and non-actionable issues",
+      "passed": true,
+      "evidence": {
+        "totals": {
+          "issues": 9,
+          "by_status": {
+            "todo": 2,
+            "in_progress": 2,
+            "in_review": 1,
+            "blocked": 1,
+            "done": 1,
+            "canceled": 1,
+            "unknown": 1
+          },
+          "actionable": 6,
+          "projects": 2
+        },
+        "project_actionable_counts": {
+          "Alpha Console": 3,
+          "Beta Workers": 2,
+          "(company-level / unassigned)": 1
+        }
+      }
+    },
+    {
+      "name": "actionable issue selection and ranking are deterministic",
+      "passed": true,
+      "evidence": {
+        "registry_actionable_order": [
+          "PC-102",
+          "PC-103",
+          "PC-104",
+          "PC-106",
+          "PC-101",
+          "PC-105"
+        ],
+        "manifest_task_order": [
+          "PC-102",
+          "PC-103",
+          "PC-104",
+          "PC-106"
+        ],
+        "non_actionable_excluded": [
+          "PC-107",
+          "PC-108",
+          "PC-109"
+        ]
+      }
+    },
+    {
+      "name": "manifest task cap drops lower-ranked actionable issues",
+      "passed": true,
+      "evidence": {
+        "actionable": 6,
+        "max_tasks": 4,
+        "manifest_tasks": 4,
+        "dropped": 2
+      }
+    },
+    {
+      "name": "receipt check-gates and sandbox wording are present",
+      "passed": true,
+      "evidence": {
+        "tasks_checked": [
+          "PC-102",
+          "PC-103",
+          "PC-104",
+          "PC-106"
+        ],
+        "gate_fragments": [
+          "test -s",
+          "grep -qiE",
+          "receipt-gate OK"
+        ],
+        "sandbox_phrase": "current task directory only; never write outside it"
+      }
+    },
+    {
+      "name": "normal sync is idempotent apart from timestamp fields",
+      "passed": true,
+      "evidence": {
+        "normalized_artifacts_equal": true,
+        "ignored_timestamp_fields": [
+          "registry.synced_at",
+          "manifest._synced_at"
+        ],
+        "first_timestamps": {
+          "registry.synced_at": "2026-07-11T16:37:25.623266+00:00",
+          "manifest._synced_at": "2026-07-11T16:37:25.623266+00:00"
+        },
+        "second_timestamps": {
+          "registry.synced_at": "2026-07-11T16:37:25.669736+00:00",
+          "manifest._synced_at": "2026-07-11T16:37:25.669736+00:00"
+        }
+      }
+    },
+    {
+      "name": "unknown flag behavior recorded against fixture only",
+      "passed": true,
+      "evidence": {
+        "returncode": 0,
+        "stdout_lines": [
+          "Paperclip -> Ringer sync @ 2026-07-11T16:37:25.716457+00:00",
+          "  company=jack.digital  projects=2  issues=9  actionable=6",
+          "  by_status={'todo': 2, 'in_progress': 2, 'in_review': 1, 'blocked': 1, 'done': 1, 'canceled': 1, 'unknown': 1}",
+          "  manifest tasks=4  (DROPPED 2 beyond MAX_TASKS=4 \u2014 raise PAPERCLIP_SYNC_MAX_TASKS to include)",
+          "  [dry-run] no files written"
+        ],
+        "stderr_lines": [],
+        "request_count": 2,
+        "behavior": "--help is not parsed as help; the sync path still runs when pointed at the fixture",
+        "live_source_contacted": false
+      }
+    }
+  ],
+  "generated_artifacts": [
+    "fixture-repo/scripts/paperclip_to_ringer_sync.py",
+    "fixture_paperclip_server.py",
+    "sitecustomize.py",
+    "run_sync_verification.py",
+    "fixture-repo/registry/paperclip-fleet.json",
+    "fixture-repo/manifests/paperclip-fleet-sync.json",
+    "fixture-request-log.jsonl",
+    "sync-verification.json"
+  ],
+  "generated_artifact_metadata": [
+    {
+      "path": "fixture-repo/scripts/paperclip_to_ringer_sync.py",
+      "exists": true,
+      "bytes": 9031,
+      "sha256": "06f878be3acc7ece79bb99df43c5c4f7f860a2803cec86ceaa57d9cceff07068"
+    },
+    {
+      "path": "fixture_paperclip_server.py",
+      "exists": true,
+      "bytes": 5126,
+      "sha256": "3455f3dd706cf815e4ce5a1a17e38dd2559cc431969515b11c1f1e95e6f80d42"
+    },
+    {
+      "path": "sitecustomize.py",
+      "exists": true,
+      "bytes": 1972,
+      "sha256": "ae76ca9c80b2778938770fb860975a401c6969b388ce35826293fb3313202dfd"
+    },
+    {
+      "path": "run_sync_verification.py",
+      "exists": true,
+      "bytes": 20362,
+      "sha256": "63d11f8e0dc28daa6ee146999a7d9293273880a4808f22c085068bae8eb344dd"
+    },
+    {
+      "path": "fixture-repo/registry/paperclip-fleet.json",
+      "exists": true,
+      "bytes": 2520,
+      "sha256": "3bf98dcc39fc553e1b5b6343526fbd057c8f28c354668c28f355100d03031898"
+    },
+    {
+      "path": "fixture-repo/manifests/paperclip-fleet-sync.json",
+      "exists": true,
+      "bytes": 4428,
+      "sha256": "59264efbbf38806492b1f43c5b1e842c0438b27ec694dafdc9ea360019eb78e0"
+    },
+    {
+      "path": "fixture-request-log.jsonl",
+      "exists": false,
+      "bytes": 0,
+      "sha256": null
+    },
+    {
+      "path": "sync-verification.json",
+      "exists": true,
+      "bytes": null,
+      "sha256": null,
+      "note": "this report; hash omitted to avoid self-referential metadata"
+    }
+  ],
+  "side_effect_scope": "task-directory-only",
+  "side_effect_details": {
+    "writes": "Only under /private/tmp/ringer-aegis-audit-20260711/test_generator",
+    "source_repository": "Read-only source script comparison; no writes to /Users/hermes/ringer",
+    "paperclip": "No live Paperclip calls; all sync runs used the local fixture transport",
+    "network": "Loopback HTTP listener on an ephemeral port",
+    "transport": {
+      "mode": "http_listener",
+      "listener_started": true,
+      "bind_error": null,
+      "base_url": "http://127.0.0.1:64150"
+    }
+  },
+  "findings": [
+    {
+      "name": "unknown CLI flags are ignored",
+      "severity": "medium",
+      "detail": "The copied script only checks for '--dry-run' in sys.argv. A fixture-only '--help --dry-run' invocation fetched Paperclip data and printed a sync summary instead of usage text."
+    }
+  ],
+  "overall_pass": true
+}

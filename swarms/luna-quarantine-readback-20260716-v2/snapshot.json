@@ -1,0 +1,143 @@
+{
+  "agents": [
+    {
+      "adapterConfig": {
+        "checkpoints": true,
+        "command": "/Users/hermes/.hermes/hermes-agent/venv/bin/hermes",
+        "effort": "high",
+        "env": {
+          "HERMES_HOME": {
+            "type": "plain",
+            "value": "/Users/hermes/.hermes/profiles/luna"
+          }
+        },
+        "model": "gpt-5.6-luna",
+        "modelReasoningEffort": "high",
+        "provider": "copilot",
+        "timeoutSec": 900,
+        "toolsets": "terminal, file"
+      },
+      "adapterType": "hermes_local",
+      "id": "2f92499a-9b6b-48f3-8319-8657e8fe48de",
+      "name": "Luna High Planner",
+      "status": "error",
+      "updatedAt": "2026-07-16T21:20:57.263Z"
+    }
+  ],
+  "captured_at_utc": "2026-07-16T21:34:57.934063+00:00",
+  "issues": [
+    {
+      "assigneeAgentId": null,
+      "executionRunId": null,
+      "id": "5ee74759-d521-4fef-93d3-eb866511694c",
+      "identifier": "JAC-3625",
+      "priority": "high",
+      "status": "todo",
+      "title": "Guard Luna exact Copilot policy against stale concurrent recovery replay",
+      "updatedAt": "2026-07-16T21:34:17.984Z"
+    },
+    {
+      "assigneeAgentId": "80284e06-41ab-415a-ba1c-6c3121debd0d",
+      "executionRunId": "09c85b42-8619-4dbb-a3aa-c11996e061c3",
+      "id": "1ae451b8-32e6-48b6-9e4d-6c30c9e9c2a8",
+      "identifier": "JAC-3609",
+      "priority": "high",
+      "status": "in_progress",
+      "title": "Restore Luna Copilot identity entitlement without model-policy drift",
+      "updatedAt": "2026-07-16T21:34:06.517Z"
+    },
+    {
+      "assigneeAgentId": "80284e06-41ab-415a-ba1c-6c3121debd0d",
+      "executionRunId": null,
+      "id": "a9f340bb-2a3e-4757-8c3b-bee28d028f4d",
+      "identifier": "JAC-3626",
+      "priority": "high",
+      "status": "done",
+      "title": "Wings quarantine legacy Luna recovery lanes behind JAC-3609",
+      "updatedAt": "2026-07-16T21:32:18.382Z"
+    },
+    {
+      "assigneeAgentId": "f83be6e5-ccc8-4689-a4a8-ec1dcef9b667",
+      "executionRunId": null,
+      "id": "f62da4fa-a186-44ee-90b7-b0dbe2d0bd88",
+      "identifier": "JAC-3603",
+      "priority": "high",
+      "status": "blocked",
+      "title": "Diagnose and restore Luna adapter authorization for JAC-3594",
+      "updatedAt": "2026-07-16T21:29:51.400Z"
+    },
+    {
+      "assigneeAgentId": "80284e06-41ab-415a-ba1c-6c3121debd0d",
+      "executionRunId": null,
+      "id": "a5162d89-e5ab-4bfa-ba3a-c35ba9845f84",
+      "identifier": "JAC-3617",
+      "priority": "high",
+      "status": "blocked",
+      "title": "Rebind JAC-3595 execution to exact Herdr workspace",
+      "updatedAt": "2026-07-16T21:28:29.390Z"
+    },
+    {
+      "assigneeAgentId": "80284e06-41ab-415a-ba1c-6c3121debd0d",
+      "executionRunId": null,
+      "id": "a5875b8e-33f8-47cc-b78b-8e9a0b2730dd",
+      "identifier": "JAC-3608",
+      "priority": "high",
+      "status": "blocked",
+      "title": "Approve Luna provider pin and correct herdr execution workspace",
+      "updatedAt": "2026-07-16T21:28:28.520Z"
+    },
+    {
+      "assigneeAgentId": "80284e06-41ab-415a-ba1c-6c3121debd0d",
+      "executionRunId": null,
+      "id": "33b38456-6653-4a27-aeeb-f76f449a656f",
+      "identifier": "JAC-3622",
+      "priority": "high",
+      "status": "blocked",
+      "title": "Decide canonical Luna profile/auth continuity for JAC-3612",
+      "updatedAt": "2026-07-16T21:28:27.682Z"
+    },
+    {
+      "assigneeAgentId": null,
+      "executionRunId": null,
+      "id": "8676e7b4-166a-4684-9282-c1253be6346e",
+      "identifier": "JAC-3595",
+      "priority": "high",
+      "status": "blocked",
+      "title": "Implement adjudication limits and correlated failure-receipt gates",
+      "updatedAt": "2026-07-16T21:17:48.541Z"
+    },
+    {
+      "assigneeAgentId": null,
+      "executionRunId": null,
+      "id": "feacb699-f804-4836-b589-ff50677ca9bf",
+      "identifier": "JAC-3594",
+      "priority": "high",
+      "status": "blocked",
+      "title": "Implement initial-modal cleanup and lane-session continuity gates",
+      "updatedAt": "2026-07-16T21:17:48.160Z"
+    },
+    {
+      "assigneeAgentId": null,
+      "executionRunId": null,
+      "id": "8b616780-38e8-4196-957b-607018ec2ee9",
+      "identifier": "JAC-3593",
+      "priority": "high",
+      "status": "blocked",
+      "title": "Implement working-transition and deadline-before-mutation gates",
+      "updatedAt": "2026-07-16T21:17:47.540Z"
+    },
+    {
+      "assigneeAgentId": null,
+      "executionRunId": null,
+      "id": "46839114-1e68-4296-bc60-9766da1f01d8",
+      "identifier": "JAC-3592",
+      "priority": "high",
+      "status": "blocked",
+      "title": "Implement exact model-catalog and footer gates",
+      "updatedAt": "2026-07-16T21:17:46.818Z"
+    }
+  ],
+  "predecessor_failed_run": "luna-quarantine-readback-20260716-20260716T213002Z-p28304",
+  "predecessor_failure": "manifest check encoded a pre-capture JAC-3622=todo assumption, while captured state correctly had JAC-3622=blocked",
+  "source": "Paperclip live API on Aegis; sanitized fields only"
+}

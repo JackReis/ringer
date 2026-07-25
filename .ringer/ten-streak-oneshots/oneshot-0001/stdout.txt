@@ -1,0 +1,32 @@
+Ringer manifest written, executed, hardened, and verified.
+
+Results:
+- Run ID: `ringer-reliability-tools-20260714-1447-20260714T195347Z-p58930`
+- Ringer exit: `0`
+- Tasks: `3 PASS / 0 FAIL`
+- Attempts: `1, 1, 1`
+- Verification: `executed-check` for all tasks
+- Deliverables: `6/6` present
+- Tests after live-data hardening: `41 passed`
+
+Produced:
+- Run-evidence verifier
+- Manifest-policy checker
+- Clean-streak auditor
+
+Live-data testing found and repaired two fixture gaps:
+- Shared eval logs now ignore rows belonging to unrelated runs.
+- Schema-v3 manifest validation now recognizes and validates required `workdir`.
+
+Key files:
+- Manifest: `/Users/hermes/ringer/swarms/ringer-reliability-tools-20260714-1447/swarm.json`
+- Closeout: `/Users/hermes/ringer/swarms/ringer-reliability-tools-20260714-1447/CLOSEOUT.md`
+- Live verification: `/Users/hermes/ringer/swarms/ringer-reliability-tools-20260714-1447/live-run-verification.json`
+- Policy report: `/Users/hermes/ringer/swarms/ringer-reliability-tools-20260714-1447/manifest-policy-report.json`
+- Streak report: `/Users/hermes/ringer/swarms/ringer-reliability-tools-20260714-1447/clean-streak-report.json`
+- Immutable state: `/Users/hermes/.ringer/runs/ringer-reliability-tools-20260714-1447-20260714T195347Z-p58930.json`
+- HTML report: `/Users/hermes/.ringer/artifacts/ringer-reliability-tools-20260714-1447-20260714T195347Z-p58930-report.html`
+
+No commit or push was performed.
+
+`jack-green-phoenix`

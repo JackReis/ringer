@@ -1,0 +1,96 @@
+{
+  "artifact_type": "legacy_commit_log_preservation_and_dedup_candidate",
+  "created_at_utc": "2026-07-14T00:14:44Z",
+  "lifecycle_bead": "notes-4bwsk",
+  "paperclip_parent": "JAC-3383",
+  "retired_writer": {
+    "job_id": "62f9a439503b",
+    "name": "hermes-ledger",
+    "former_schedule": "every 240m",
+    "state": "removed",
+    "enabled": false,
+    "paused_at": "2026-07-13T19:09:08.766090-05:00",
+    "removal_receipt": "Cron job 'hermes-ledger' removed",
+    "replacement_job": "none"
+  },
+  "raw": {
+    "source_path": "/Users/jack.reis/tracking/commit-log.md",
+    "archive_path": "/Users/jack.reis/tracking/archive/legacy-commit-log-20260714T001444Z/commit-log.raw.md",
+    "sha256": "240e3143520994c7299d20cdcce7358982b8d6c23e1910056eaec143c73876df",
+    "bytes": 872724,
+    "lines_by_wc": 28475,
+    "parsed_entries": 3558,
+    "unique_commit_identities": 1347,
+    "excess_duplicate_entries": 2211,
+    "duplicate_identity_keys": 746,
+    "metadata_conflict_identity_keys": 0,
+    "mode": "0444",
+    "byte_identity_check": "PASS"
+  },
+  "deduplicated_candidate": {
+    "path": "/Users/jack.reis/tracking/archive/legacy-commit-log-20260714T001444Z/commit-log.deduplicated.candidate.md",
+    "sha256": "dec964d98330c56c4d44865d53b6a9c478a5214066525eb2b8e0758102a29db9",
+    "bytes": 328178,
+    "lines": 10794,
+    "sections": 1347,
+    "commit_field_rows": 1352,
+    "unique_section_identity_tuples": 1347,
+    "excess_duplicate_sections": 0,
+    "sections_with_multiple_commit_fields_preserved": 2,
+    "dropped_duplicate_sections": 2211,
+    "malformed_sections_preserved": 0,
+    "deduplication_identity": "complete ordered commit-field tuple per section",
+    "contract_header": "retired historical compatibility projection; Git is SOT; no scheduler writes this file",
+    "mode": "0444"
+  },
+  "authority_contract": {
+    "commit_source_of_truth": "Git",
+    "canonical_ai_usage_ledger": "/Users/jack.reis/.hermes/ledger",
+    "legacy_projection": "/Users/jack.reis/tracking/commit-log.md",
+    "replacement_job": "none",
+    "consumer_decision": "retire mutating writer; keep idempotent compatibility command only"
+  },
+  "compatibility_code": {
+    "candidate_branch": "fix/ledger-idempotency-parent",
+    "candidate_commit": "ed159a393b8594587bfce53d59b5a47303498294",
+    "base_commit": "0f89282dab7039027afdd1f69c68b53b05977322",
+    "candidate_branch_pushed": true,
+    "main_publish_state": "blocked_pending_ringer_pass",
+    "ledger_py_sha256": "0efefe2f9012b030fa569a00afbf8c1b1dd929bd055064ef7a9815d7277fdf4c",
+    "test_ledger_py_sha256": "5edc5b7739531a7d7158a230edefee4bfd2ae4f580fbfd72021e36c77868ae92",
+    "focused_tests": "4 passed",
+    "full_suite": "76 passed",
+    "behaviors": [
+      "repeated-window no-op",
+      "partial-overlap only writes new commits",
+      "legacy short-SHA compatibility",
+      "full-SHA writes",
+      "fcntl concurrent-writer serialization",
+      "explicit new/skipped/total output"
+    ]
+  },
+  "live_cutover": {
+    "active_projection_path": "/Users/jack.reis/tracking/commit-log.md",
+    "active_projection_sha256": "dec964d98330c56c4d44865d53b6a9c478a5214066525eb2b8e0758102a29db9",
+    "active_projection_bytes": 328178,
+    "active_projection_sections": 1347,
+    "active_projection_unique_section_identity_tuples": 1347,
+    "active_projection_excess_duplicate_sections": 0,
+    "installed_ledger_py_sha256": "0efefe2f9012b030fa569a00afbf8c1b1dd929bd055064ef7a9815d7277fdf4c",
+    "installed_test_ledger_py_sha256": "5edc5b7739531a7d7158a230edefee4bfd2ae4f580fbfd72021e36c77868ae92",
+    "canonical_usage_health": "overall_status=ok; ledger_status=ok; rows=3045",
+    "canonical_sync_job": "6c168fc9f871 enabled=true state=scheduled last_status=ok",
+    "executable_consumer_matches": 0,
+    "isolated_live_smoke": "first new=7 skipped=13 total=20; second new=0 skipped=20 total=20; zero duplicate sections"
+  },
+  "bifrost_receipt": {
+    "deployment_id": "degraded-ledger-resolution-20260714",
+    "success_log_id": "cd0389e9-1fba-4919-805f-a296730ad249",
+    "response_id": "8d4dc001f1784b1382b89a92779238e5",
+    "provider": "mistral",
+    "model": "mistral-small-latest",
+    "status": "success",
+    "verdict": "SOUND",
+    "receipt_path": "/Users/jack.reis/tracking/archive/legacy-commit-log-20260714T001444Z/bifrost-receipt.json"
+  }
+}
