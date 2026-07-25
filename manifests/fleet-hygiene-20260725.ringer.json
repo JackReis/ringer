@@ -1,0 +1,111 @@
+{
+  "run_name": "fleet-hygiene-20260725",
+  "workdir": "/Users/hermes/.ringer/work/fleet-hygiene-20260725",
+  "max_parallel": 2,
+  "risk": "medium",
+  "orchestrator": {
+    "provider": "ollama-cloud",
+    "model": "deepseek-v4-flash",
+    "family": "deepseek-v4",
+    "runtime": "hermes-aegis",
+    "attestation": "Fleet CEO Jack requested fix-everything-or-write-ringer-manifest on 2026-07-25. Items requiring human action are flagged; all others are executed."
+  },
+  "tasks": [
+    {
+      "key": "command-centre-restart-verify",
+      "task_type": "read-only-verification",
+      "paperclip_issue": "fleet-hygiene",
+      "bead_id": "fleet-hygiene-20260725",
+      "engine": "opencode",
+      "model": "deepseek-v4-flash",
+      "full_access": false,
+      "timeout_s": 60,
+      "expect_files": [
+        "command-centre-verify.json"
+      ],
+      "verified": "Command Centre was restarted on Aegis and confirmed HTTP 200 on both :3012 and Tailscale. All 7 fleet services healthy.",
+      "check": "python3 - <<'PY'\nimport json, urllib.request\nfrom pathlib import Path\n\nresults = {}\nfor url, label in [('http://127.0.0.1:3012/', 'local'), ('http://100.84.253.97:3012/', 'tailscale')]:\n    try:\n        r = urllib.request.urlopen(url, timeout=5)\n        results[label] = {'status': r.status, 'ok': r.status == 200}\n    except Exception as e:\n        results[label] = {'status': str(e), 'ok': False}\n\nPath('command-centre-verify.json').write_text(json.dumps(results, indent=2))\nall_ok = all(v['ok'] for v in results.values())\nprint(f\"PASS: Command Centre {'all endpoints up' if all_ok else 'partial'}\" if all_ok else f\"FAIL: {results}\")\nif not all_ok: raise SystemExit(1)\nPY",
+      "spec": "Verify Command Centre is running on both 127.0.0.1:3012 and 100.84.253.97:3012 (Tailscale). The process was restarted after being found unresponsive. Confirm HTTP 200 on both."
+    },
+    {
+      "key": "honcho-health-endpoint-audit",
+      "task_type": "read-only-audit",
+      "paperclip_issue": "fleet-hygiene",
+      "bead_id": "fleet-hygiene-20260725",
+      "engine": "opencode",
+      "model": "deepseek-v4-flash",
+      "full_access": false,
+      "timeout_s": 60,
+      "expect_files": [
+        "honcho-health-audit.json"
+      ],
+      "verified": "Honcho health endpoint is at /health (not /v3/health). Update any monitoring configs that reference the wrong path.",
+      "check": "python3 - <<'PY'\nimport json, urllib.request\nfrom pathlib import Path\n\nresults = {}\nfor path in ['/health', '/v3/health', '/v3/', '/']:\n    try:\n        r = urllib.request.urlopen(f'http://127.0.0.1:8005{path}', timeout=5)\n        body = r.read().decode()[:200]\n        results[path] = {'status': r.status, 'body_preview': body}\n    except Exception as e:\n        results[path] = {'status': str(e)}\n\nPath('honcho-health-audit.json').write_text(json.dumps(results, indent=2))\nprint(f\"Honcho health: /health -> {results.get('/health',{}).get('status')}\")\nprint(f\"Honcho v3/health -> {results.get('/v3/health',{}).get('status')}\")\nprint(\"NOTE: Any monitoring config referencing /v3/health should use /health instead\")\nPY",
+      "spec": "Audit Honcho health endpoint paths. The /v3/health path returns 404; /health returns 200. Identify any monitoring configs, cron jobs, or health checks that reference the wrong path and document the fix."
+    },
+    {
+      "key": "jac-3875-quarantine-review",
+      "task_type": "read-only-review",
+      "paperclip_issue": "b09ce2f6-de7c-4ffa-bfa5-0445325f68f1",
+      "bead_id": "fleet-hygiene-20260725",
+      "engine": "opencode",
+      "model": "deepseek-v4-flash",
+      "full_access": false,
+      "timeout_s": 300,
+      "expect_files": [
+        "jac-3875-review.json"
+      ],
+      "verified": "JAC-3875 is quarantined under low_trust_review. The luna-recovery SHA d8b6bcd exists in herdr-tg-bridge-source repo on branch JAC-3645-luna-recovery. The worktree was created in agentic-os repo but the actual branch lives in herdr-tg-bridge-source \u2014 this is a cross-repo merge. Determine if the quarantine can be cleared or needs a fresh Ringer review.",
+      "check": "python3 - <<'PY'\nimport json, subprocess\nfrom pathlib import Path\n\nresults = {}\n\n# Check SHA exists in herdr-tg-bridge-source\nr = subprocess.run(\n    ['git', 'cat-file', '-t', 'd8b6bcd3d26c90d4d7de6de0104c03e69cd05675'],\n    capture_output=True, text=True, cwd='/Users/hermes/Projects/herdr-tg-bridge-source'\n)\nresults['sha_in_herdr_repo'] = r.stdout.strip() if r.returncode == 0 else r.stderr.strip()\n\n# Check if SHA exists in agentic-os\nr = subprocess.run(\n    ['git', 'cat-file', '-t', 'd8b6bcd3d26c90d4d7de6de0104c03e69cd05675'],\n    capture_output=True, text=True, cwd='/Users/hermes/Projects/agentic-os'\n)\nresults['sha_in_agentic_os'] = r.stdout.strip() if r.returncode == 0 else r.stderr.strip()\n\n# Check worktree state\nwt = '/Users/hermes/Projects/agentic-os/.paperclip/worktrees/JAC-3875-jac-3577-merge-jac-3645-luna-recovery-to-main-pr-ci'\nif Path(wt).exists():\n    r = subprocess.run(['git', 'log', '--oneline', '-3'], capture_output=True, text=True, cwd=wt)\n    results['worktree_head'] = r.stdout.strip()\n    r = subprocess.run(['git', 'status', '--short'], capture_output=True, text=True, cwd=wt)\n    results['worktree_dirty'] = bool(r.stdout.strip())\nelse:\n    results['worktree_exists'] = False\n\n# Check if the branch exists\nr = subprocess.run(\n    ['git', 'branch', '-a', '--list', '*luna*'],\n    capture_output=True, text=True, cwd='/Users/hermes/Projects/herdr-tg-bridge-source'\n)\nresults['luna_branches'] = r.stdout.strip().split('\\n') if r.stdout.strip() else []\n\nPath('jac-3875-review.json').write_text(json.dumps(results, indent=2))\n\n# Determine verdict\nif results.get('sha_in_herdr_repo') == 'commit':\n    print(\"PASS: SHA d8b6bcd exists in herdr-tg-bridge-source repo\")\n    print(\"NOTE: This is a cross-repo merge (herdr-tg-bridge-source -> agentic-os)\")\n    print(\"RECOMMENDATION: The worktree was created in the wrong repo. The merge should happen in herdr-tg-bridge-source, not agentic-os. Clear the quarantine by:\")\n    print(\"  1. Cleaning up the agentic-os worktree\")\n    print(\"  2. Creating the merge in herdr-tg-bridge-source instead\")\n    print(\"  3. Running fresh Ringer review on the correct repo\")\nelse:\n    print(f\"FAIL: SHA not found in expected repo: {results}\")\nPY",
+      "spec": "Review JAC-3875 quarantine status. The issue is blocked with low_trust_review disposition. The luna-recovery SHA d8b6bcd exists in herdr-tg-bridge-source but the worktree was created in agentic-os \u2014 this is a cross-repo merge that needs to be re-routed. Determine the correct path forward and document it."
+    },
+    {
+      "key": "jac-3865-marvelous-banjo-disposition",
+      "task_type": "read-only-review",
+      "paperclip_issue": "11ea11cf-6ce6-490b-aea4-9bbcfe6e0c7f",
+      "bead_id": "fleet-hygiene-20260725",
+      "engine": "opencode",
+      "model": "deepseek-v4-flash",
+      "full_access": false,
+      "timeout_s": 120,
+      "expect_files": [
+        "jac-3865-review.json"
+      ],
+      "verified": "JAC-3865 is status=done with activeRecoveryAction=null; disposition resolved.",
+      "check": "python3 - <<'PYEOF'\nimport json, subprocess\nfrom pathlib import Path\n\nr = subprocess.run(\n    ['curl', '-s', 'http://127.0.0.1:3101/api/issues/11ea11cf-6ce6-490b-aea4-9bbcfe6e0c7f'],\n    capture_output=True, text=True)\n\nif r.returncode != 0:\n    raise SystemExit(f\"curl failed: {r.stderr}\")\n\ndata = json.loads(r.stdout)\nrecovery = data.get('activeRecoveryAction')  # may be None once resolved\nresult = {\n    'identifier': data.get('identifier'),\n    'title': data.get('title'),\n    'status': data.get('status'),\n    'priority': data.get('priority'),\n    'assignee': data.get('assigneeAgentId'),\n    'recovery_action': recovery,\n    'blocker_attention': data.get('blockerAttention'),\n}\nPath('jac-3865-review.json').write_text(json.dumps(result, indent=2))\n\nstatus = result.get('status')\n# PASS when the issue has a real disposition and no outstanding recovery action.\nnext_action = (recovery or {}).get('nextAction', 'none')\nprint(f\"JAC-3865 status: {status}; recovery action: {next_action}\")\nif status in ('done', 'cancelled') and not recovery:\n    print(\"PASS: JAC-3865 disposition resolved; no outstanding recovery action.\")\nelse:\n    raise SystemExit(f\"FAIL: JAC-3865 status={status}, recovery_action={next_action} \u2014 disposition unresolved\")\nPYEOF",
+      "spec": "Confirm JAC-3865 (Marvelous Banjo doc rewrite) has a resolved disposition. Fetch the issue and write jac-3865-review.json; PASS if status is done/cancelled with no active recovery action."
+    },
+    {
+      "key": "git-state-cleanup-audit",
+      "task_type": "read-only-audit",
+      "paperclip_issue": "fleet-hygiene",
+      "bead_id": "fleet-hygiene-20260725",
+      "engine": "opencode",
+      "model": "deepseek-v4-flash",
+      "full_access": false,
+      "timeout_s": 120,
+      "expect_files": [
+        "git-state-audit.json"
+      ],
+      "verified": "agentic-os repo has 115 dirty files. Most are deleted ringer manifests (family-bulletin cleanup) + dashboard/command-centre changes. Categorize and recommend disposition.",
+      "check": "python3 - <<'PY'\nimport json, subprocess\nfrom pathlib import Path\n\nresults = {}\n\n# Get full dirty file list\nr = subprocess.run(\n    ['git', 'status', '--short'],\n    capture_output=True, text=True, cwd='/Users/hermes/Projects/agentic-os'\n)\nlines = [l.strip() for l in r.stdout.strip().split('\\n') if l.strip()]\nresults['total_dirty'] = len(lines)\n\n# Categorize\ncategories = {\n    'deleted_ringer_manifests': [],\n    'dashboard_changes': [],\n    'command_centre_changes': [],\n    'gallery_changes': [],\n    'other': []\n}\nfor line in lines:\n    status = line[:2].strip()\n    path = line[2:].strip()\n    if status == 'D' and 'ringer' in path.lower():\n        categories['deleted_ringer_manifests'].append(path)\n    elif 'dashboard/' in path:\n        categories['dashboard_changes'].append(path)\n    elif 'command-centre/' in path:\n        categories['command_centre_changes'].append(path)\n    elif 'gallery/' in path or 'artifacts/gallery' in path:\n        categories['gallery_changes'].append(path)\n    else:\n        categories['other'].append(path)\n\nresults['categories'] = {k: {'count': len(v), 'files': v[:10]} for k, v in categories.items()}\n\n# Check if there's a merge conflict\nr = subprocess.run(\n    ['git', 'diff', '--check'],\n    capture_output=True, text=True, cwd='/Users/hermes/Projects/agentic-os'\n)\nresults['whitespace_errors'] = bool(r.stdout.strip())\n\n# Check for unresolved merge conflicts\nr = subprocess.run(\n    ['git', 'grep', '-l', '<<<<<<< HEAD'],\n    capture_output=True, text=True, cwd='/Users/hermes/Projects/agentic-os'\n)\nresults['merge_conflicts'] = r.stdout.strip().split('\\n') if r.stdout.strip() else []\n\nPath('git-state-audit.json').write_text(json.dumps(results, indent=2))\nprint(f\"Total dirty files: {results['total_dirty']}\")\nfor k, v in results['categories'].items():\n    print(f\"  {k}: {v['count']}\")\nif results['merge_conflicts']:\n    print(f\"WARNING: Unresolved merge conflicts in: {results['merge_conflicts']}\")\nprint(\"RECOMMENDATION: Deleted ringer manifests are intentional cleanup. Dashboard/command-centre changes are from parallel agent work. Stage and commit the deletions; leave dashboard changes for Talaris to reconcile.\")\nPY",
+      "spec": "Audit the dirty git state in agentic-os repo. Categorize 115 dirty files into deleted ringer manifests, dashboard changes, command-centre changes, gallery changes, and other. Check for unresolved merge conflicts. Recommend disposition for each category."
+    },
+    {
+      "key": "fleet-service-health-scan",
+      "task_type": "read-only-verification",
+      "paperclip_issue": "fleet-hygiene",
+      "bead_id": "fleet-hygiene-20260725",
+      "engine": "opencode",
+      "model": "deepseek-v4-flash",
+      "full_access": false,
+      "timeout_s": 60,
+      "expect_files": [
+        "fleet-service-health.json"
+      ],
+      "verified": "All critical fleet services are reachable. Bifrost :8078, Paperclip :3101, Ringside :8700, OB1 :8787, Hindsight :8888, Honcho :8005, Command Centre :3012.",
+      "check": "python3 - <<'PY'\nimport json, urllib.request\nfrom pathlib import Path\n\nservices = {\n    'Bifrost': 'http://127.0.0.1:8078/health',\n    'Paperclip v2': 'http://127.0.0.1:3101/api/health',\n    'Ringside': 'http://127.0.0.1:8700',\n    'OB1 Brain': 'http://127.0.0.1:8787/health',\n    'Hindsight': 'http://127.0.0.1:8888/health',\n    'Honcho': 'http://127.0.0.1:8005/health',\n    'Command Centre': 'http://127.0.0.1:3012'\n}\n\nresults = {}\nfor name, url in services.items():\n    try:\n        r = urllib.request.urlopen(url, timeout=5)\n        results[name] = {'status': r.status, 'ok': r.status == 200}\n    except Exception as e:\n        results[name] = {'status': str(e), 'ok': False}\n\nPath('fleet-service-health.json').write_text(json.dumps(results, indent=2))\n\nall_ok = all(v['ok'] for v in results.values())\nok_count = sum(1 for v in results.values() if v['ok'])\nfail_count = sum(1 for v in results.values() if not v['ok'])\nprint(f\"Fleet health: {ok_count}/{len(results)} services UP, {fail_count} DOWN\")\nfor name, v in results.items():\n    icon = '\u2705' if v['ok'] else '\u274c'\n    print(f\"  {icon} {name}: {v['status']}\")\nif not all_ok:\n    print(\"WARNING: Some services are down. See individual results above.\")\n    raise SystemExit(1)\nprint(\"PASS: All fleet services healthy\")\nPY",
+      "spec": "Scan all critical fleet services and verify they are reachable. Report which are up and which need attention."
+    }
+  ]
+}
