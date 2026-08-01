@@ -311,3 +311,7 @@ checks and raw logs support — no vibes, no worker self-reports.
 
 ## opencode / z-ai glm-5.2 (via openrouter)
 - 2026-07-09 (aicred-invoice-downloads, 4 code-fix tasks + 1 follow-up, worktrees+npm ci checks): systematic attempt-1 NO-OP — all 4 parallel workers produced zero edits and no summary on first attempt, then completed cleanly on attempt 2 after retry-prompt injection (34k-69k tokens each). Follow-up single task passed attempt 1. Suspect first-invocation session warm-up in opencode-sandboxed under parallel spawn; budget for 2 attempts on parallel GLM batches. Output quality on Next.js/Stripe route+test work: solid, spec-faithful, one boss-caught design gap (used user-scoped supabase client where RLS demanded service role — spec didn't say explicitly; say it explicitly).
+
+### 2026-07-25 — probe (aegis-tailscale-ssh-swap)
+- codex/gpt-5.5: FAIL — OpenAI usage limit exhausted (retry after Jul 28). Codex lane dead till then.
+- opencode default (lm-studio/google/gemma-4-26b-a4b-qat): TIMEOUT x2 @600s on a trivial read-only 2-file probe — local model too slow for probe lane; don't route probes to the local gemma default. Prefer a cloud OpenRouter slug or kimi when Codex is down.

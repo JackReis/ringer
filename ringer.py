@@ -636,6 +636,8 @@ class TaskSpec:
     # engine's {model} placeholder); empty means the engine's model_default.
     model: str = ""
     task_type: str = ""
+    paperclip_issue: str = ""
+    bead_id: str = ""
 
     @classmethod
     def from_obj(cls, obj: dict[str, Any]) -> "TaskSpec":
@@ -676,6 +678,12 @@ class TaskSpec:
         task_type = obj.get("task_type", "")
         if not isinstance(task_type, str):
             raise ValueError(f"task {key}: task_type must be a string")
+        paperclip_issue = obj.get("paperclip_issue", "")
+        if not isinstance(paperclip_issue, str):
+            raise ValueError(f"task {key}: paperclip_issue must be a string")
+        bead_id = obj.get("bead_id", "")
+        if not isinstance(bead_id, str):
+            raise ValueError(f"task {key}: bead_id must be a string")
         return cls(
             key=key,
             spec=spec,
@@ -688,6 +696,8 @@ class TaskSpec:
             verified=verified.strip(),
             model=model.strip(),
             task_type=task_type.strip(),
+            paperclip_issue=paperclip_issue.strip(),
+            bead_id=bead_id.strip(),
         )
 
 

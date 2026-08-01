@@ -212,27 +212,173 @@ class IdealProviderProtocolTests(unittest.TestCase):
         """Test that ideal envelope works with complex packet content."""
         # Test various types of content and structure
         test_packets = [
-            packet(),  # Use the standard fixture 
+            packet(),  # Use the standard fixture
         ]
-        
+
         for i, p in enumerate(test_packets):
             e = ip.make_ideal_envelope(
                 envelope_id=f'complex-env-{i}',
                 provider_id='test-provider',
-                model_id='test-model', 
+                model_id='test-model',
                 request_id='test-request',
                 packet=p,
                 now=NOW
             )
-            
-            # Should validate properly  
+
+            # Should validate properly
             pp.validate_envelope(e, now=NOW)
-            
+
             self.assertEqual(e['protocol_version'], pp.PROTOCOL_VERSION)
             self.assertTrue(e['envelope_id'].startswith('complex-env-'))
 
-        # Test that the standard tests are not broken by our implementation
-        # If we get to this point, we're doing something right
+    def test_ideal_envelope_expired_packet_validation(self):
+        """Test that ideal envelope validates expired packets."""
+        expired_packet = {
+            "schema_version": cp.SCHEMA_VERSION,
+            "packet_id": "expired-1",
+            "subject": "expired",
+            "created_at": "2026-07-14T11:00:00Z",
+            "expires_at": "2026-07-14T12:00:00Z",  # Expired at NOW
+            "evidence": [{
+                "evidence_id": "e-1",
+                "media_type": "text/plain",
+                "content": "data",
+                "provenance": {"source": "adapter", "observed_at": "2026-07-14T11:00:00Z", "retrieved_at": "2026-07-14T11:00:00Z"},
+                "freshness": {"max_age_seconds": 900}
+            }]
+        }
+        sealed = cp.seal_packet(expired_packet)
 
-if __name__=='__main__': 
+        with self.assertRaises(Exception):
+            ip.make_ideal_envelope(
+                envelope_id='expired-env',
+                provider_id='test-provider',
+                model_id='test-model',
+                request_id='test-request',
+                packet=sealed,
+                now=LATER  # Way past expiration
+            )
+
+    def test_ideal_envelope_multiple_evidence_items(self):
+        """Test ideal envelope with multiple evidence items in packet."""
+        p = {
+            "schema_version": cp.SCHEMA_VERSION,
+            "packet_id": "multi-evidence",
+            "subject": "multi",
+            "created_at": "2026-07-14T12:05:00Z",
+            "expires_at": "2026-07-14T12:30:00Z",
+            "evidence": [
+                {
+                    "evidence_id": "e-1",
+                    "media_type": "text/plain",
+                    "content": "first",
+                    "provenance": {"source": "adapter:test", "observed_at": "2026-07-14T12:00:00Z", "retrieved_at": "2026-07-14T12:00:00Z"},
+                    "freshness": {"max_age_seconds": 900}
+                },
+                {
+                    "evidence_id": "e-2",
+                    "media_type": "application/json",
+                    "content": '{"data": "second"}',
+                    "provenance": {"source": "adapter:test2", "observed_at": "2026-07-14T12:01:00Z", "retrieved_at": "2026-07-14T12:01:00Z"},
+                    "freshness": {"max_age_seconds": 600}
+                }
+            ]
+        }
+        sealed = cp.seal_packet(p)
+
+        e = ip.make_ideal_envelope(
+            envelope_id='multi-env',
+            provider_id='anthropic',
+            model_id='claude-opus',
+            request_id='multi-req',
+            packet=sealed,
+            now=NOW
+        )
+
+        pp.validate_envelope(e, now=NOW)
+        self.assertEqual(len(e['packet']['evidence']), 2)
+
+    def test_ideal_envelope_refresh_preserves_metadata(self):
+        """Test that refresh preserves envelope metadata."""
+        original_envelope = ideal_envelope()
+        original_id = original_envelope['envelope_id']
+
+        class PreservingAdapter:
+            def fetch_packet(self, **kwargs):
+                return fresh_packet()
+
+        refreshed = ip.refresh_ideal_envelope(
+            original_envelope,
+            PreservingAdapter(),
+            now=LATER
+        )
+
+        # Envelope IDs should remain the same
+        self.assertEqual(refreshed['envelope_id'], original_id)
+        self.assertEqual(refreshed['provider_id'], original_envelope['provider_id'])
+        self.assertEqual(refreshed['model_id'], original_envelope['model_id'])
+        self.assertEqual(refreshed['request_id'], original_envelope['request_id'])
+
+    def test_ideal_envelope_adapter_exception_handling(self):
+        """Test that adapter exceptions are properly wrapped."""
+        class FailingAdapter:
+            def fetch_packet(self, **kwargs):
+                raise ValueError("Adapter failed!")
+
+        e = ideal_envelope()
+
+        with self.assertRaises(ip.IdealProviderProtocolError):
+            ip.refresh_ideal_envelope(e, FailingAdapter(), now=LATER)
+
+    def test_ideal_envelope_packet_mutation_isolation(self):
+        """Test that ideal envelope doesn't expose mutations of input packet."""
+        original_packet = packet()
+
+        # Create envelope
+        e = ip.make_ideal_envelope(
+            envelope_id='isolation-env',
+            provider_id='test',
+            model_id='test-model',
+            request_id='test-req',
+            packet=original_packet,
+            now=NOW
+        )
+
+        # Envelope should have independent copy
+        self.assertIsNot(e['packet'], original_packet)
+        self.assertEqual(e['packet'], original_packet)
+
+    def test_ideal_envelope_edge_case_very_long_subject(self):
+        """Test ideal envelope with edge case like very long subject (at max limit)."""
+        long_subject = "x" * 512  # Max allowed length
+        p = {
+            "schema_version": cp.SCHEMA_VERSION,
+            "packet_id": "edge-1",
+            "subject": long_subject,
+            "created_at": "2026-07-14T12:05:00Z",
+            "expires_at": "2026-07-14T12:30:00Z",
+            "evidence": [{
+                "evidence_id": "e-1",
+                "media_type": "text/plain",
+                "content": "data",
+                "provenance": {"source": "adapter", "observed_at": "2026-07-14T12:00:00Z", "retrieved_at": "2026-07-14T12:00:00Z"},
+                "freshness": {"max_age_seconds": 900}
+            }]
+        }
+        sealed = cp.seal_packet(p)
+
+        e = ip.make_ideal_envelope(
+            envelope_id='edge-env',
+            provider_id='test',
+            model_id='test',
+            request_id='edge-req',
+            packet=sealed,
+            now=NOW
+        )
+
+        pp.validate_envelope(e, now=NOW)
+        self.assertEqual(e['packet']['subject'], long_subject)
+        self.assertEqual(len(e['packet']['subject']), 512)
+
+if __name__=='__main__':
     unittest.main(verbosity=2)
