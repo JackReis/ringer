@@ -39,14 +39,34 @@ fi
 
 TASKDIR_REAL="$(cd "$TASKDIR" && pwd -P)"
 
+# Set up cleanup before creating any temp files so an early crash or signal
+# doesn't leak them. The function body is updated below once paths are known.
+cleanup() {
+  # Guard against uninitialized vars during early termination.
+  [ -n "${SCRATCH:-}" ] && rm -rf "$SCRATCH"
+  [ -n "${PROFILE:-}" ] && rm -f "$PROFILE"
+}
+trap cleanup EXIT
+
 # Per-run scratch root — becomes both TMPDIR and XDG_CACHE_HOME for OpenCode, so
 # we never have to open all of /private/tmp or ~/.cache to the sandboxed agent.
 # Resolve to the real path (/var/folders symlinks to /private/var/folders);
 # Seatbelt subpath matching needs the canonical path or writes EPERM-crash.
-SCRATCH="$(cd "$(mktemp -d -t ringer-opencode-scratch)" && pwd -P)"
+# NOTE: we must validate mktemp output before cd/pwd because set -e is
+# disabled inside command substitutions — a failed mktemp would leave SCRATCH
+# pointing at the current working directory (often $HOME), bypassing the sandbox.
+SCRATCH_TMP="$(mktemp -d -t ringer-opencode-scratch)"
+if [ -z "$SCRATCH_TMP" ] || [ ! -d "$SCRATCH_TMP" ]; then
+  echo "opencode-sandboxed.sh: mktemp -d failed for scratch directory" >&2
+  exit 1
+fi
+SCRATCH="$(cd "$SCRATCH_TMP" && pwd -P)"
+
 PROFILE="$(mktemp -t ringer-opencode-prof)"
-cleanup() { rm -rf "$SCRATCH" "$PROFILE"; }
-trap cleanup EXIT
+if [ -z "$PROFILE" ] || [ ! -f "$PROFILE" ]; then
+  echo "opencode-sandboxed.sh: mktemp failed for profile file" >&2
+  exit 1
+fi
 
 # Paths are passed to the profile via sandbox-exec -D parameters, NOT string
 # interpolation — a task dir containing quotes/parens/newlines can't inject rules.
