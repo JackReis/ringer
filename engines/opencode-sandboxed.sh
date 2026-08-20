@@ -70,9 +70,14 @@ if ! SCRATCH="$(cd "$SCRATCH_TMP" && pwd -P)"; then
   exit 1
 fi
 
-PROFILE="$(mktemp -t ringer-opencode-prof)"
-if [ -z "$PROFILE" ] || [ ! -f "$PROFILE" ]; then
+# Same set -e-safe pattern as the scratch mktemp above: run mktemp inside
+# `if ! ...` so a failure surfaces our diagnostic instead of exiting silently.
+if ! PROFILE="$(mktemp -t ringer-opencode-prof)"; then
   echo "opencode-sandboxed.sh: mktemp failed for profile file" >&2
+  exit 1
+fi
+if [ -z "$PROFILE" ] || [ ! -f "$PROFILE" ]; then
+  echo "opencode-sandboxed.sh: mktemp returned invalid profile file" >&2
   exit 1
 fi
 
