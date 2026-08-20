@@ -42,9 +42,11 @@ TASKDIR_REAL="$(cd "$TASKDIR" && pwd -P)"
 # Set up cleanup before creating any temp files so an early crash or signal
 # doesn't leak them. The function body is updated below once paths are known.
 cleanup() {
-  # Guard against uninitialized vars during early termination.
-  [ -n "${SCRATCH:-}" ] && rm -rf "$SCRATCH"
-  [ -n "${PROFILE:-}" ] && rm -f "$PROFILE"
+  # Guard against uninitialized vars during early termination. Tolerate rm
+  # failures so `set -e` can't abort the trap mid-run or replace the script's
+  # intended exit status; always end cleanly.
+  [ -n "${SCRATCH:-}" ] && rm -rf "$SCRATCH" || true
+  [ -n "${PROFILE:-}" ] && rm -f "$PROFILE" || true
 }
 trap cleanup EXIT
 
@@ -55,20 +57,23 @@ trap cleanup EXIT
 # NOTE: mktemp runs inside `if ! ...` so a failure surfaces our diagnostic
 # instead of `set -e` exiting the script silently; and SCRATCH is pre-assigned
 # before the canonicalizing cd/pwd so the EXIT trap still removes the temp dir
-# even if the cd fails (previously SCRATCH_TMP leaked in that path).
+# even if the validation or the cd fails (previously SCRATCH_TMP leaked in
+# those paths). The canonical path resolves into SCRATCH_REAL and is only
+# promoted to SCRATCH on success, so a failed cd can never clobber SCRATCH.
 if ! SCRATCH_TMP="$(mktemp -d -t ringer-opencode-scratch)"; then
   echo "opencode-sandboxed.sh: mktemp -d failed for scratch directory" >&2
   exit 1
 fi
+SCRATCH="$SCRATCH_TMP"  # trap-cleaned from here on, even if the cd below fails
 if [ -z "$SCRATCH_TMP" ] || [ ! -d "$SCRATCH_TMP" ]; then
   echo "opencode-sandboxed.sh: mktemp -d returned invalid scratch directory" >&2
   exit 1
 fi
-SCRATCH="$SCRATCH_TMP"  # trap-cleaned from here on, even if the cd below fails
-if ! SCRATCH="$(cd "$SCRATCH_TMP" && pwd -P)"; then
+if ! SCRATCH_REAL="$(cd "$SCRATCH_TMP" && pwd -P)"; then
   echo "opencode-sandboxed.sh: cannot resolve scratch dir: $SCRATCH_TMP" >&2
   exit 1
 fi
+SCRATCH="$SCRATCH_REAL"
 
 # Same set -e-safe pattern as the scratch mktemp above: run mktemp inside
 # `if ! ...` so a failure surfaces our diagnostic instead of exiting silently.
