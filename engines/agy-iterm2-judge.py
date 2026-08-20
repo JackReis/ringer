@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import os
 import shlex
 import signal
@@ -60,6 +61,10 @@ BUSY_TOKENS = (
 DEFAULT_MODEL = "Gemini 3.1 Pro (High)"
 DEFAULT_DELIVERABLE = "agy-judge-report.md"
 TRANSCRIPT_NAME = "agy-iterm2-transcript.txt"
+SUBMIT_RECEIPT_NAME = "agy-iterm2-submit-receipt.json"
+SUBMIT_ATTEMPTS = 3
+TYPE_SETTLE_S = 0.35
+SUBMIT_SETTLE_S = 1.0
 
 
 def log(msg: str) -> None:
@@ -97,6 +102,33 @@ def is_busy(text: str) -> bool:
     return any(tok in text for tok in BUSY_TOKENS)
 
 
+def prompt_is_visible(text: str, prompt: str) -> bool:
+    """Use a short prefix because iTerm may wrap the rest across screen lines."""
+    return prompt[:40] in text
+
+
+async def submit_prompt(session, prompt: str) -> tuple[bool, int, str]:
+    """Type a prompt and submit it with terminal Enter (CR), retrying safely.
+
+    A bare ``\n`` is a line-feed. Antigravity's multiline editor accepts that as
+    input instead of treating it as the Enter action, leaving a fully typed
+    prompt sitting onscreen. Terminal Enter is carriage return (``\r``), sent
+    separately after the text so embedded newlines remain part of the prompt.
+    """
+    screen = ""
+    for attempt in range(1, SUBMIT_ATTEMPTS + 1):
+        if attempt == 1 or not prompt_is_visible(screen, prompt):
+            await session.async_send_text(prompt)
+            await asyncio.sleep(TYPE_SETTLE_S)
+        await session.async_send_text("\r")
+        await asyncio.sleep(SUBMIT_SETTLE_S)
+        screen = await screen_text(session)
+        if is_busy(screen) or not prompt_is_visible(screen, prompt):
+            return True, attempt, screen
+        log(f"prompt still present after Enter attempt {attempt}; retrying Enter")
+    return False, SUBMIT_ATTEMPTS, screen
+
+
 def run(ns: argparse.Namespace) -> int:
     """Synchronous entry: file setup, then drive agy via the iTerm2 API.
 
@@ -115,6 +147,7 @@ def run(ns: argparse.Namespace) -> int:
 
     deliv = taskdir / ns.deliverable
     transcript = taskdir / TRANSCRIPT_NAME
+    submit_receipt = taskdir / SUBMIT_RECEIPT_NAME
     prompt_file = taskdir / ".agy-task-prompt.md"
     prompt_file.write_text(ns.spec_text, encoding="utf-8")
 
@@ -177,14 +210,40 @@ def run(ns: argparse.Namespace) -> int:
                 return
             await asyncio.sleep(2.0)  # let the input settle
 
-            await session.async_send_text(bootstrap + "\n")
-            await asyncio.sleep(1.0)
-            submitted_screen = await screen_text(session)
-            if bootstrap[:40] not in submitted_screen and not is_busy(submitted_screen):
-                log("prompt was not accepted on first send; retrying")
-                await session.async_send_text(bootstrap + "\n")
-                await asyncio.sleep(1.0)
-            log("prompt submitted; awaiting completion")
+            submitted, submit_attempt, submitted_screen = await submit_prompt(
+                session, bootstrap
+            )
+            submit_receipt.write_text(
+                json.dumps(
+                    {
+                        "submitted": submitted,
+                        "attempt": submit_attempt,
+                        "submit_key": "carriage-return",
+                        "model": ns.model,
+                        "prompt_file": prompt_file.name,
+                        "deliverable": ns.deliverable,
+                        "recorded_at": time.strftime(
+                            "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
+                        ),
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            if not submitted:
+                log(
+                    f"prompt remained in the editor after {submit_attempt} "
+                    "carriage-return attempts"
+                )
+                await _dump(session)
+                result["rc"] = 9
+                return
+            log(
+                f"prompt submission confirmed attempt={submit_attempt} "
+                "key=carriage-return; awaiting completion"
+            )
 
             started = False
             idle = 0

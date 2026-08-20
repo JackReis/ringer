@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 from pathlib import Path
 import unittest
@@ -64,6 +65,77 @@ class AgyIterm2JudgeTests(unittest.TestCase):
 
     def test_file_completion_requires_multiple_stable_polls(self) -> None:
         self.assertGreaterEqual(self.engine.FILE_STABLE_POLLS, 5)
+
+    def test_prompt_visibility_uses_wrapping_safe_prefix(self) -> None:
+        prompt = "Read the file .agy-task-prompt.md and complete the task."
+
+        self.assertTrue(
+            self.engine.prompt_is_visible(f"prefix\n{prompt[:40]}\nsuffix", prompt)
+        )
+        self.assertFalse(self.engine.prompt_is_visible("Generating", prompt))
+
+    def test_submit_prompt_types_then_sends_carriage_return(self) -> None:
+        prompt = "First line\nSecond line"
+
+        class FakeSession:
+            def __init__(self) -> None:
+                self.sent = []
+
+            async def async_send_text(self, text: str) -> None:
+                self.sent.append(text)
+
+        session = FakeSession()
+        original_screen_text = self.engine.screen_text
+        original_type_settle = self.engine.TYPE_SETTLE_S
+        original_submit_settle = self.engine.SUBMIT_SETTLE_S
+        self.engine.screen_text = lambda _session: asyncio.sleep(
+            0, result="Generating · esc to cancel"
+        )
+        self.engine.TYPE_SETTLE_S = 0
+        self.engine.SUBMIT_SETTLE_S = 0
+        try:
+            submitted, attempt, _screen = asyncio.run(
+                self.engine.submit_prompt(session, prompt)
+            )
+        finally:
+            self.engine.screen_text = original_screen_text
+            self.engine.TYPE_SETTLE_S = original_type_settle
+            self.engine.SUBMIT_SETTLE_S = original_submit_settle
+
+        self.assertTrue(submitted)
+        self.assertEqual(attempt, 1)
+        self.assertEqual(session.sent, [prompt, "\r"])
+
+    def test_submit_prompt_retries_enter_without_retyping_visible_prompt(self) -> None:
+        prompt = "Read the file .agy-task-prompt.md and complete the task."
+
+        class FakeSession:
+            def __init__(self) -> None:
+                self.sent = []
+
+            async def async_send_text(self, text: str) -> None:
+                self.sent.append(text)
+
+        screens = iter([prompt, "Thinking about the request"])
+        session = FakeSession()
+        original_screen_text = self.engine.screen_text
+        original_type_settle = self.engine.TYPE_SETTLE_S
+        original_submit_settle = self.engine.SUBMIT_SETTLE_S
+        self.engine.screen_text = lambda _session: asyncio.sleep(0, result=next(screens))
+        self.engine.TYPE_SETTLE_S = 0
+        self.engine.SUBMIT_SETTLE_S = 0
+        try:
+            submitted, attempt, _screen = asyncio.run(
+                self.engine.submit_prompt(session, prompt)
+            )
+        finally:
+            self.engine.screen_text = original_screen_text
+            self.engine.TYPE_SETTLE_S = original_type_settle
+            self.engine.SUBMIT_SETTLE_S = original_submit_settle
+
+        self.assertTrue(submitted)
+        self.assertEqual(attempt, 2)
+        self.assertEqual(session.sent, [prompt, "\r", "\r"])
 
     def test_launcher_uses_the_dedicated_iterm2_environment(self) -> None:
         launcher = LAUNCHER_PATH.read_text(encoding="utf-8")
