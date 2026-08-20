@@ -52,15 +52,23 @@ trap cleanup EXIT
 # we never have to open all of /private/tmp or ~/.cache to the sandboxed agent.
 # Resolve to the real path (/var/folders symlinks to /private/var/folders);
 # Seatbelt subpath matching needs the canonical path or writes EPERM-crash.
-# NOTE: we must validate mktemp output before cd/pwd because set -e is
-# disabled inside command substitutions — a failed mktemp would leave SCRATCH
-# pointing at the current working directory (often $HOME), bypassing the sandbox.
-SCRATCH_TMP="$(mktemp -d -t ringer-opencode-scratch)"
-if [ -z "$SCRATCH_TMP" ] || [ ! -d "$SCRATCH_TMP" ]; then
+# NOTE: mktemp runs inside `if ! ...` so a failure surfaces our diagnostic
+# instead of `set -e` exiting the script silently; and SCRATCH is pre-assigned
+# before the canonicalizing cd/pwd so the EXIT trap still removes the temp dir
+# even if the cd fails (previously SCRATCH_TMP leaked in that path).
+if ! SCRATCH_TMP="$(mktemp -d -t ringer-opencode-scratch)"; then
   echo "opencode-sandboxed.sh: mktemp -d failed for scratch directory" >&2
   exit 1
 fi
-SCRATCH="$(cd "$SCRATCH_TMP" && pwd -P)"
+if [ -z "$SCRATCH_TMP" ] || [ ! -d "$SCRATCH_TMP" ]; then
+  echo "opencode-sandboxed.sh: mktemp -d returned invalid scratch directory" >&2
+  exit 1
+fi
+SCRATCH="$SCRATCH_TMP"  # trap-cleaned from here on, even if the cd below fails
+if ! SCRATCH="$(cd "$SCRATCH_TMP" && pwd -P)"; then
+  echo "opencode-sandboxed.sh: cannot resolve scratch dir: $SCRATCH_TMP" >&2
+  exit 1
+fi
 
 PROFILE="$(mktemp -t ringer-opencode-prof)"
 if [ -z "$PROFILE" ] || [ ! -f "$PROFILE" ]; then
