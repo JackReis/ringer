@@ -395,25 +395,6 @@ Every community PR that lands in main is credited here — that's a project rule
 
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the philosophy and what gets a PR merged fast. The short version: small and scoped, rebased on current main, every claim backed by an executed test. Authorship is always preserved — where a maintainer pushes a mechanical fix to your branch, you remain the commit author.
 
-## Preflight: Ringer engine-bin gate
-
-Before dispatching any swarm, verify every configured engine's `bin` is actually
-present. **Never** substitute `which <engine>` for availability — it false-negatives
-when the engine lives in a PATH dir omitted from the default shell (e.g. `~/.local/bin`),
-which can wrongly force a `delegate_task` fallback. The gate resolves each
-`[engines.NAME].bin` directly from `config.toml`:
-
-```bash
-bash "$(pwd)/scripts/verify-ringer-engines.sh" <config.toml>
-# or probe a host without a preflight abort:
-python3 scripts/ring-engine-probe.py <config.toml>
-```
-
-Routing policy: **native Ringer first** (Aegis `codex`/`opencode`/`hermes`/`kimi`, then
-Talaris `claude_code`/`codex`); `delegate_task` only after the probe proves no native
-engine is available, and always logged as an explicit fallback. See the fleet routing
-decision record at `=notes/docs/superpowers/plans/2026-08-16-aegis-ringer-routing-decision.md`.
-
 ## License
 
 [PolyForm Shield 1.0.0](LICENSE.md) — free to use, modify, and share, including inside your own commercial work. The one thing you can't do is offer Ringer or Ringside (or a derivative that competes with them) as a product or service of your own. Commercial rights to the tool itself belong to Nate Jones Media LLC.
