@@ -92,6 +92,16 @@ CSP_META_TAG = (
     '<meta http-equiv="Content-Security-Policy" '
     'content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:">'
 )
+DISK_PRESSURE_STATE_DIR = Path(
+    os.environ.get(
+        "RINGER_DISK_GUARD_STATE_DIR",
+        str(Path.home() / ".local" / "state" / "ringer" / "disk-guard"),
+    )
+)
+DISK_PRESSURE_MARKER = DISK_PRESSURE_STATE_DIR / "DISK_PRESSURE"
+BLOCKED_LAUNCHES_PATH = DISK_PRESSURE_STATE_DIR / "blocked-launches.jsonl"
+RINGER_MIN_FREE_BYTES = int(os.environ.get("RINGER_MIN_FREE_BYTES", str(60 * 1024**3)))
+RINGER_MIN_FREE_FRACTION = float(os.environ.get("RINGER_MIN_FREE_FRACTION", "0.15"))
 DASHBOARD_HTML_PATH = Path(__file__).resolve().parent / "dashboard" / "dashboard.html"
 RINGSIDE_HTML_PATH = Path(__file__).resolve().parent / "dashboard" / "ringside.html"
 MINIMAL_DASHBOARD_HTML = """<!doctype html>
@@ -10131,6 +10141,150 @@ ENGINE_INSTALL_HINTS = {
 }
 
 
+class DiskPressureError(RuntimeError):
+    """Raised before worker or worktree creation when disk headroom is unsafe."""
+
+
+def repo_checkout_bytes(repo: Path | None) -> int:
+    if repo is None or not repo.is_dir():
+        return 0
+    # A worktree materializes the TRACKED tree at HEAD — never untracked files
+    # and never .git (shared). Measuring the working directory with du counted
+    # ~46 GiB of untracked episode media on a repo whose real checkout is
+    # ~1.7 GiB, projecting 96 GiB for two lanes and falsely blocking launches
+    # (2026-07-31). Sum blob sizes at HEAD instead; fall back to du only when
+    # git cannot answer (non-repo dir, timeout).
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo), "ls-tree", "-r", "-l", "HEAD"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode == 0:
+            total = 0
+            for line in result.stdout.splitlines():
+                parts = line.split(None, 4)
+                if len(parts) >= 4 and parts[3].isdigit():
+                    total += int(parts[3])
+            if total > 0:
+                return total
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        pass
+    try:
+        result = subprocess.run(
+            [
+                "du",
+                "-sx",
+                "--block-size=1",
+                "--exclude=.git",
+                "--",
+                str(repo),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        return int(result.stdout.split()[0]) if result.returncode == 0 else 0
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return 0
+
+
+def projected_worktree_bytes(manifest: Manifest) -> int:
+    if not manifest.worktrees:
+        return 0
+    return repo_checkout_bytes(manifest.repo) * len(manifest.tasks)
+
+
+def record_blocked_launch(
+    manifest: Manifest,
+    *,
+    reason: str,
+    free_bytes: int,
+    required_headroom_bytes: int,
+    projected_bytes: int,
+) -> None:
+    receipt = {
+        "blocked_at": datetime.now(timezone.utc).isoformat(),
+        "run_name": manifest.run_name,
+        "reason": reason,
+        "free_bytes": free_bytes,
+        "required_headroom_bytes": required_headroom_bytes,
+        "projected_bytes": projected_bytes,
+        "task_count": len(manifest.tasks),
+        "worktrees": manifest.worktrees,
+    }
+    append_text(BLOCKED_LAUNCHES_PATH, json.dumps(receipt, sort_keys=True) + "\n")
+
+
+def _headroom_probe_path(path: Path) -> Path:
+    while not path.exists() and path != path.parent:
+        path = path.parent
+    return path
+
+
+def preflight_disk_headroom(
+    manifest: Manifest,
+    *,
+    disk_usage: shutil._ntuple_diskusage | None = None,
+    projected_bytes: int | None = None,
+    pressure_marker: Path | None = None,
+    record_block: bool = True,
+) -> dict[str, int | float | bool | str]:
+    if disk_usage is None:
+        targets = [manifest.workdir]
+        if manifest.worktrees and manifest.repo is not None:
+            targets.append(manifest.repo)
+        probe_paths = [_headroom_probe_path(path) for path in targets]
+        usages = [shutil.disk_usage(path) for path in probe_paths]
+        probe_index = min(range(len(usages)), key=lambda index: usages[index].free)
+        usage = usages[probe_index]
+        probe_path = str(probe_paths[probe_index])
+    else:
+        usage = disk_usage
+        probe_path = "injected"
+    projection = (
+        projected_worktree_bytes(manifest)
+        if projected_bytes is None
+        else projected_bytes
+    )
+    required = max(RINGER_MIN_FREE_BYTES, int(usage.total * RINGER_MIN_FREE_FRACTION))
+    marker = pressure_marker if pressure_marker is not None else DISK_PRESSURE_MARKER
+    marker_active = marker.exists()
+    remaining = usage.free - projection
+    reason = ""
+    if marker_active:
+        reason = "disk pressure marker is active"
+    elif usage.free < required:
+        reason = "current free space is below the required headroom"
+    elif remaining < required:
+        reason = "projected worktrees would consume the required headroom"
+    if reason:
+        if record_block:
+            record_blocked_launch(
+                manifest,
+                reason=reason,
+                free_bytes=usage.free,
+                required_headroom_bytes=required,
+                projected_bytes=projection,
+            )
+        raise DiskPressureError(
+            f"{reason}: free={usage.free / 1024**3:.1f} GiB, "
+            f"projected={projection / 1024**3:.1f} GiB, "
+            f"required_remaining={required / 1024**3:.1f} GiB"
+        )
+    return {
+        "free_bytes": usage.free,
+        "projected_bytes": projection,
+        "required_headroom_bytes": required,
+        "remaining_bytes": remaining,
+        "pressure_marker_active": marker_active,
+        "probe_path": probe_path,
+    }
+
+
 def preflight_engine_bins(manifest: Manifest, config: AppConfig) -> None:
     """Fail before spawning anything if a worker binary is missing.
 
@@ -10860,6 +11014,7 @@ def run_one_request(config: AppConfig, args: argparse.Namespace) -> int:
         redact=args.redact,
     )
     validate_manifest_engines(manifest, config)
+    preflight_disk_headroom(manifest)
     preflight_engine_bins(manifest, config)
     identity = resolve_identity(
         args.identity,
@@ -11662,6 +11817,7 @@ def main(argv: list[str] | None = None) -> int:
             # Deliberately before preflight_engine_bins: baseline spawns no
             # workers, so a missing engine binary must not block it.
             return asyncio.run(run_baseline(manifest, config=config))
+        preflight_disk_headroom(manifest)
         preflight_engine_bins(manifest, config)
         if args.command == "run":
             start_catalog_auto_refresh()
