@@ -82,7 +82,10 @@ def save_posted(state: Path, ids: set[str]) -> None:
         "run_ids": sorted(ids),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    # Atomic replace avoids truncated ledger on crash mid-write (review B-1).
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def _parse_ts(value: Any) -> datetime | None:
@@ -119,10 +122,10 @@ def ringside_ref(state: Path, *, now: datetime | None = None) -> str:
     latest = latest_run_logged_at(state)
     now = now or datetime.now(timezone.utc)
     if latest is None:
-        return "ringside: withheld-stale"
+        return "withheld-stale"
     age = (now - latest.astimezone(timezone.utc)).total_seconds()
     if age > STALE_HOURS * 3600:
-        return "ringside: withheld-stale"
+        return "withheld-stale"
     return os.environ.get("RINGER_MULTICA_RINGSIDE_URL") or DEFAULT_RINGSIDE_URL
 
 
@@ -172,7 +175,14 @@ def artifact_path_for(run: dict[str, Any]) -> str:
 def sha_hint(path_s: str, *, logged_at: str = "") -> str:
     p = Path(path_s).expanduser()
     if p.is_file():
-        digest = hashlib.sha256(p.read_bytes()).hexdigest()[:16]
+        h = hashlib.sha256()
+        with p.open("rb") as fh:
+            while True:
+                chunk = fh.read(65536)
+                if not chunk:
+                    break
+                h.update(chunk)
+        digest = h.hexdigest()[:16]
         mtime = datetime.fromtimestamp(p.stat().st_mtime).astimezone().isoformat(
             timespec="seconds"
         )
@@ -374,7 +384,7 @@ def maybe_post_receipt(
             )
 
     return ReceiptResult(
-        "posted" if not dry_run else "posted",
+        "dry_run" if dry_run else "posted",
         run_id=rid,
         issue_id=issue,
         detail="dry_run" if dry_run else "ok",

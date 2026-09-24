@@ -148,7 +148,7 @@ class MulticaReceiptTests(unittest.TestCase):
         old = (datetime.now(timezone.utc) - timedelta(hours=72)).isoformat()
         self._write_run("run-stale", logged_at=old)
         ref = mr.ringside_ref(self.state)
-        self.assertEqual("ringside: withheld-stale", ref)
+        self.assertEqual("withheld-stale", ref)
 
     def test_ringside_url_when_fresh(self) -> None:
         self._write_run("run-fresh")
@@ -165,13 +165,13 @@ class MulticaReceiptTests(unittest.TestCase):
         body = mr.format_receipt_body(
             issue_id="AEGI-78",
             run=run,
-            ringside="ringside: withheld-stale",
+            ringside="withheld-stale",
         )
         for needle in (
             "run_id: abc",
             "verdict: FAIL",
             "artifact: /tmp/art.md",
-            "ringside: ringside: withheld-stale",
+            "ringside: withheld-stale",
             "Multica issue: AEGI-78",
             "posted_at:",
         ):
