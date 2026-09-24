@@ -8316,6 +8316,8 @@ class RingerRunner:
             if self.dashboard is not None:
                 self.dashboard.stop()
             self.logger.close()
+            # Multica receipt close-loop (AEGI-78): comment-only, fail-open.
+            self._maybe_post_multica_receipt()
             print_summary(self.run_id, self.runtimes)
             print("Model log updated; run './ringer.py models' for the per-model scoreboard.")
             # The post-run journey: tell a human exactly where the results live.
@@ -8324,6 +8326,44 @@ class RingerRunner:
                     results_page = artifact_live_path(self.state_writer.state_dir, self.manifest.run_name)
                     print(f"\nYour results: {results_page}")
                     print("Open it in a browser, or run './ringer.py hud' for the full Ringside view (http://127.0.0.1:8700).")
+
+
+    def _maybe_post_multica_receipt(self) -> None:
+        """Post one Multica receipt for this run_id after Judge rows are logged.
+
+        Fail-open: Multica errors never change the run exit code / verdict.
+        Disabled when RINGER_MULTICA_RECEIPT=0 or MULTICA_ISSUE_ID is unset.
+        """
+        try:
+            # Import from sibling hooks/ so the live launcher path keeps working
+            # when this worktree (or the owned fork) is the ringer.py source.
+            hooks_dir = Path(__file__).resolve().parent / "hooks"
+            if str(hooks_dir.parent) not in sys.path:
+                sys.path.insert(0, str(hooks_dir.parent))
+            from hooks.multica_receipt import maybe_post_receipt_for_run
+
+            result = maybe_post_receipt_for_run(
+                self.run_id,
+                state_dir_path=self.config.state_dir,
+            )
+            if result.status == "posted":
+                print(
+                    f"Multica receipt posted: {result.run_id} → {result.issue_id}",
+                    flush=True,
+                )
+            elif result.status == "error":
+                print(
+                    f"warning: Multica receipt failed (fail-open): {result.detail}",
+                    flush=True,
+                )
+            elif result.status == "skipped":
+                print(
+                    f"Multica receipt idempotent skip: {result.run_id}",
+                    flush=True,
+                )
+        except Exception as exc:  # pragma: no cover - belt-and-suspenders fail-open
+            with contextlib.suppress(Exception):
+                print(f"warning: Multica receipt hook error (fail-open): {exc}", flush=True)
 
     async def kill_all_workers(self) -> None:
         procs = list(self.active_processes.values())

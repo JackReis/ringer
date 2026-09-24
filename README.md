@@ -277,6 +277,24 @@ check_interval_s = 3600
 
 Every worker attempt — pass, fail, timeout, retry — is logged with its spec, engine, duration, token count, and the raw check output. Local JSONL by default; point `[eval.postgres]` at a database to aggregate across machines. Failure rows are the point: they tell you which spec styles, engines, and task shapes actually work, so the swarm gets better on evidence instead of vibes.
 
+## Multica Judge receipts (fleet)
+
+When `MULTICA_ISSUE_ID` is set (e.g. `AEGI-78`), Ringer posts **one** Multica
+comment after Judge rows are written to `~/.ringer/runs.jsonl`. Implementation:
+`hooks/multica_receipt.py` (called from `RingerRunner` post-run). Comment-only —
+does not wake Multica agents. Fail-open: a Multica outage never flips PASS→FAIL.
+
+| Env | Effect |
+| --- | --- |
+| `MULTICA_ISSUE_ID` | Owning issue; required for posting |
+| `RINGER_MULTICA_RECEIPT=0` | Disable posting |
+| `RINGER_MULTICA_RINGSIDE_URL` | Override Ringside URL (else Tailscale HUD, or `ringside: withheld-stale` if ledger >48h) |
+
+Idempotency ledger: `~/.ringer/receipts/multica-posted.json`. The SAFE-NOW shell
+wrapper (`ringer-with-receipt`) remains backward-compatible until PATH cutover;
+see `CUTOVER.md`. Fleet-internal fork — PolyForm Shield still applies; do not
+publish as competing SaaS.
+
 ## Model performance log
 
 ### Model identity taxonomy

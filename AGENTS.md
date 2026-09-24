@@ -26,3 +26,10 @@ Ankit explicitly approved storing his own test-contact identity here for harness
   (a directory entry fails the run even when the check passes; cost two wasted runs 2026-08-04).
 - Mint discipline: validate-then-mint only, mints are unattached, Bland auto-increments the
   version number; only Ankit flips a line.
+
+## Multica receipts (fleet close-loop)
+
+- After Judge logging, `hooks/multica_receipt.py` may comment on `MULTICA_ISSUE_ID`.
+- Disable with `RINGER_MULTICA_RECEIPT=0`. Never wake Multica agents; fail-open on post errors.
+- Do not swap `/Users/hermes/.local/bin/ringer` until `CUTOVER.md` gate clears.
+
