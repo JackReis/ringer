@@ -122,3 +122,16 @@ Do not open `[eval.postgres] env_file`, engine auth files, or catalog credential
 Run JSON, `library.json`, `active-runs.json`, and the HTML artifacts are replaced atomically by Ringer's own writer. `runs.jsonl` and steering observations are append-only. An agent harvesting memory does not write, truncate, or replace those paths, and does not pass a flag whose job is to overwrite them. The derived scoreboard database and the catalog snapshot are the same: read, or regenerate only when the human asked for a refresh.
 
 Source of this map: `StateWriter.snapshot`, `artifact_outcome_from_state`, `append_artifact_library_version`, `read_active_runs`, `EvalLogger.log_attempt`, `verdict_for`, `_harvest_deliverables_on_pass`, and the Ringside routes in `PersistentHudServer`.
+
+## Fleet trust guidelines
+
+Vault and skill source of truth is the fleet-information-unification skill and `Architecture/fleet/FLEET-INFORMATION-UNIFICATION-DOCTRINE-20260927.md` (Multica AEGI-164 / AEGI-186, PASS stamp `01a0e549-8ddd-7624-b95d-9355e6d3d314`). These pointers cover harvest, draft, and review. They do not change receipt files.
+
+- Prefer Cursor cloud for draft/review.
+- Trust rotation: Claude Code → ChatGPT/Codex → Gemini (Antigravity) → Kimi.
+- Soft ship: draft → review → Multica stamp → apply (profile-mutate way-of-work).
+- CoS may soft-ship after stamp. Jack-gated: `--replace`, secrets, spend, irreversible.
+
+Fleet source-of-truth map: Multica assigns · Open Engine protocol · Kata closes · Hermes executes · Ringer receipts · prover proves · Vault narrative · Dune constraints.
+
+On that map, Ringer stays the receipts plane. A harvest read still does not write those files.
