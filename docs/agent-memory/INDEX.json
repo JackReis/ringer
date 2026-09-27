@@ -1,0 +1,218 @@
+{
+  "schema": "ringer.agent-memory.harvest/v1",
+  "harvested_on": "2026-09-27",
+  "repo": "ringer",
+  "placement": {
+    "loop": "open-engine / multica",
+    "ringer_role": "harness verification receipts used as routing input",
+    "memory_role": "open-engine memory holds the decision and the card pointer",
+    "coordination_role": "multica cards: project, parent (run_name), child (run_id + task). One deliverable per child.",
+    "meeting_note": "Sep 19 Ankit/Jack working direction: Ringer routes; it is not the memory store. Receipts live on the inspectable child-card deliverable."
+  },
+  "docs": [
+    {
+      "path": "docs/agent-memory/HARVEST.md",
+      "answers": "Where receipts and status live, the read order, and which fields to copy onto a card."
+    },
+    {
+      "path": "docs/agent-memory/BRANCHES.md",
+      "answers": "Which plane owns each fact: memory, harness, model, skills, Multica cards, run_name, worktrees, identity."
+    },
+    {
+      "path": "docs/agent-memory/SIMPLIFICATIONS.md",
+      "answers": "The three-question read, collapsed status words, and surfaces that stay on disk."
+    }
+  ],
+  "state_root": {
+    "default": "~/.ringer",
+    "env_override": "RINGER_HOME",
+    "config_key": "state_dir",
+    "config_file": "~/.config/ringer/config.toml"
+  },
+  "read_order": [
+    "artifacts/library.json#artifacts[<run_name>]",
+    "active-runs.json (pid still alive)",
+    "runs/<run_id>.json",
+    "task.check_output_tail",
+    "task.deliverables[].path",
+    "task.log_path",
+    "./ringer.py models --json --task-type <type>"
+  ],
+  "questions": [
+    {
+      "id": "alive",
+      "ask": "Is this run still executing?",
+      "pass": "run_id present in active-runs.json after a read (dead pids are pruned).",
+      "else": "Treat library or snapshot state live as died when the run_id is absent."
+    },
+    {
+      "id": "checked",
+      "ask": "Did the work pass?",
+      "pass": "task.verdict PASS and check_returncode 0. Library state pass means every task passed.",
+      "weak": "ask proves answer.md is non-empty. It does not prove the prose is right."
+    },
+    {
+      "id": "lane",
+      "ask": "Which model should type the next task of this type?",
+      "signal": "first_try_pass_rate on this machine's runs.jsonl",
+      "command": "./ringer.py models --json --task-type <type>"
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "run_snapshot",
+      "path": "runs/<run_id>.json",
+      "writer": "StateWriter.snapshot",
+      "cadence": "about 1s while the process lives; final flush on finish",
+      "state_values": ["live", "finished"],
+      "agent_fields": [
+        "run_id",
+        "run_name",
+        "identity",
+        "state",
+        "finished",
+        "pid",
+        "started_at",
+        "summary",
+        "totals",
+        "tasks"
+      ]
+    },
+    {
+      "id": "active_runs",
+      "path": "active-runs.json",
+      "key": "run_id",
+      "entry_fields": ["pid", "identity", "run_name", "workdir", "started_at"],
+      "note": "Read prunes dead pids. This is the alive check. The run snapshot is not."
+    },
+    {
+      "id": "eval_log",
+      "path": "runs.jsonl",
+      "config_key": "eval.jsonl_path",
+      "mode": "append-only",
+      "verify_method": "executed-check",
+      "verdicts": ["PASS", "FAIL", "TIMEOUT", "ERROR"],
+      "routing_fields": ["model", "reported_model", "expected_model", "reasoning_effort", "task_type", "retry", "verdict", "worker_engine", "worker_tokens", "duration_ms", "orchestrator", "run_id", "task_key", "logged_at"],
+      "postgres_drops": ["model", "reasoning_effort", "task_type", "retry"]
+    },
+    {
+      "id": "library",
+      "path": "artifacts/library.json",
+      "key": "run_name",
+      "entry_fields": ["live_path", "state", "identity", "current_run_id", "updated_at", "versions"],
+      "state_values": ["live", "pass", "fail", "died"],
+      "version_fields": ["run_id", "path", "report_path", "finished_at", "outcome", "tasks_pass", "tasks_fail", "deliverables"],
+      "version_cap": 20,
+      "version_order": "newest first"
+    },
+    {
+      "id": "deliverables",
+      "path": "artifacts/deliverables/<run_id>/<task_key>/<filename>",
+      "max_bytes": 20971520,
+      "fallback_max_files": 8,
+      "fallback_skipped_in": "worktrees mode",
+      "worktree_reports": ["report.md", "report.html"]
+    },
+    {
+      "id": "worker_log",
+      "non_worktree": "<workdir>/<task.key>/worker.log",
+      "worktree": "<workdir>/logs/<task.key>.worker.log",
+      "hud_tail_route": "/logs/<run_id>/<task_key>",
+      "hud_tail_bytes": 65536
+    },
+    {
+      "id": "steering_observations",
+      "path": "<steering-dir>/observations/ringer/<YYYY-MM-DD>.jsonl",
+      "check_excerpt_chars": 500,
+      "effect": "evidence only; never edits profiles"
+    },
+    {
+      "id": "scoreboard",
+      "command": "./ringer.py models --json",
+      "derived_db": "ringer.db",
+      "notes": "docs/MODEL-NOTES.md",
+      "registry": "registry/model-identity.toml",
+      "columns": ["Model", "Lab", "Harness", "API/Plan", "Tier", "Tasks", "First try", "Pass", "Tokens (median)", "Speed (median)", "Last used", "Notes"],
+      "tiers": {
+        "proven": "3+ tasks of the task_type and first_try_pass_rate >= 0.67",
+        "probation": "some local evidence, not proven",
+        "untested": "catalog candidate, no local rows"
+      },
+      "excluded_from_rank": ["unattributed legacy rows", "misrouted", "proven-model", "probation-model", "mock-model", "test-model"]
+    },
+    {
+      "id": "ringside_http",
+      "base": "http://127.0.0.1:8700",
+      "gets": ["/api/runs", "/api/library", "/api/models", "/logs/<run_id>/<task_key>", "/artifacts/*"],
+      "runs_limit": 12,
+      "human_page": true
+    }
+  ],
+  "task_status": {
+    "raw": ["queued", "running", "verifying", "retrying", "pass", "fail"],
+    "buckets": {
+      "pass": ["pass"],
+      "working": ["running", "verifying"],
+      "retry": ["retrying"],
+      "fail": ["fail", "error", "timeout", "died"],
+      "waiting": ["queued"]
+    },
+    "default_max_attempts": 2,
+    "no_retry_verdicts": ["ERROR", "PASS"]
+  },
+  "run_id_pattern": "<sanitized-run_name>-<yyyymmddThhmmssZ>-p<pid>",
+  "reserved_run_name": "model-scoreboard",
+  "identity_order": ["--identity", "FLEET_IDENTITY", "RINGER_IDENTITY", ".fleet-agent", "identity_default", "short hostname"],
+  "worktrees": {
+    "git": "git -C <repo> worktree add <workdir>/<task.key> HEAD",
+    "detached": true,
+    "named_branch": false,
+    "on_pass": "deliverable copy, then report.md/report.html snapshot, then worktree remove --force",
+    "on_fail": "worktree kept; a re-run stops until it is removed"
+  },
+  "card_pointer_fields": [
+    "run_name",
+    "run_id",
+    "identity",
+    "library_state",
+    "tasks_pass",
+    "tasks_fail",
+    "deliverables",
+    "engine",
+    "model",
+    "task_type",
+    "retry",
+    "verified",
+    "check_returncode"
+  ],
+  "do_not_read_for_memory": [
+    "artifacts/live/*.html",
+    "artifacts/versions/**/*.html",
+    "artifacts/<run_id>.html",
+    "artifacts/<run_id>-report.html",
+    "artifacts/index.html",
+    "hud/ Ringside.app",
+    "eval postgres swarm_runs",
+    "[eval.postgres] env_file",
+    "redacted task log_path",
+    "redacted task check_output_tail"
+  ],
+  "write_policy": {
+    "agent": "read",
+    "ringer_replaces": ["runs/<run_id>.json", "artifacts/library.json", "active-runs.json", "HTML artifacts"],
+    "ringer_appends": ["runs.jsonl", "steering observations"],
+    "forbidden": ["--replace", "truncate or rewrite receipt files", "catalog --refresh during a memory read", "editing steering profile status", "importing another machine's runs.jsonl"]
+  },
+  "source_anchors": [
+    "ringer.py StateWriter.snapshot",
+    "ringer.py verdict_for",
+    "ringer.py artifact_outcome_from_state",
+    "ringer.py read_active_runs",
+    "ringer.py EvalLogger.log_attempt",
+    "ringer.py _harvest_deliverables_on_pass",
+    "ringer.py PersistentHudServer",
+    "docs/TAXONOMY.md",
+    "docs/STEERING.md",
+    ".claude/skills/ringer/SKILL.md"
+  ]
+}
