@@ -125,10 +125,10 @@ Source of this map: `StateWriter.snapshot`, `artifact_outcome_from_state`, `appe
 
 ## Fleet trust guidelines
 
-Vault and skill source of truth is Fleet information unification (Multica AEGI-164 / AEGI-186). These pointers cover harvest, draft, and review. They do not change receipt files.
+Vault and skill source of truth is the fleet-information-unification skill and `Architecture/fleet/FLEET-INFORMATION-UNIFICATION-DOCTRINE-20260927.md` (Multica AEGI-164 / AEGI-186, PASS stamp `01a0e549-8ddd-7624-b95d-9355e6d3d314`). These pointers cover harvest, draft, and review. They do not change receipt files.
 
-- Prefer Cursor cloud for harvest, draft, and review.
-- Rotate review seats: Claude Code → ChatGPT/Codex → Gemini (Antigravity) → Kimi.
+- Prefer Cursor cloud for draft/review.
+- Trust rotation: Claude Code → ChatGPT/Codex → Gemini (Antigravity) → Kimi.
 - Soft ship: draft → review → Multica stamp → apply (profile-mutate way-of-work).
 - CoS may soft-ship after stamp. Jack-gated: `--replace`, secrets, spend, irreversible.
 

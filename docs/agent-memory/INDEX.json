@@ -204,11 +204,16 @@
     "forbidden": ["--replace", "truncate or rewrite receipt files", "catalog --refresh during a memory read", "editing steering profile status", "importing another machine's runs.jsonl"]
   },
   "fleet_information_unification": {
-    "note": "Vault/skill source of truth is Fleet information unification (AEGI-164/AEGI-186).",
+    "note": "Vault/skill source of truth is Fleet information unification (AEGI-164/AEGI-186). Multica PASS stamp 01a0e549-8ddd-7624-b95d-9355e6d3d314.",
     "doctrine": "Multica AEGI-186 / fleet information unification",
+    "skill": "fleet-information-unification",
+    "vault_path": "Architecture/fleet/FLEET-INFORMATION-UNIFICATION-DOCTRINE-20260927.md",
+    "prefer_cursor_cloud": "Prefer Cursor cloud for draft/review.",
+    "trust_rotation": "Trust rotation: Claude Code → ChatGPT/Codex → Gemini (Antigravity) → Kimi.",
     "trust_guidelines": [
+      "Prefer Cursor cloud for draft/review.",
       "Prefer Cursor cloud for harvest/draft/review.",
-      "Rotate review seats: Claude Code → ChatGPT/Codex → Gemini (Antigravity) → Kimi.",
+      "Trust rotation: Claude Code → ChatGPT/Codex → Gemini (Antigravity) → Kimi.",
       "Soft ship: draft → review → Multica stamp → apply (profile-mutate way-of-work).",
       "CoS may soft-ship after stamp; Jack-gated: --replace, secrets, spend, irreversible."
     ],
