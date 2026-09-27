@@ -203,6 +203,17 @@
     "ringer_appends": ["runs.jsonl", "steering observations"],
     "forbidden": ["--replace", "truncate or rewrite receipt files", "catalog --refresh during a memory read", "editing steering profile status", "importing another machine's runs.jsonl"]
   },
+  "fleet_information_unification": {
+    "note": "Vault/skill source of truth is Fleet information unification (AEGI-164/AEGI-186).",
+    "doctrine": "Multica AEGI-186 / fleet information unification",
+    "trust_guidelines": [
+      "Prefer Cursor cloud for harvest/draft/review.",
+      "Rotate review seats: Claude Code → ChatGPT/Codex → Gemini (Antigravity) → Kimi.",
+      "Soft ship: draft → review → Multica stamp → apply (profile-mutate way-of-work).",
+      "CoS may soft-ship after stamp; Jack-gated: --replace, secrets, spend, irreversible."
+    ],
+    "fleet_sot_map": "Multica assigns · Open Engine protocol · Kata closes · Hermes executes · Ringer receipts · prover proves · Vault narrative · Dune constraints."
+  },
   "source_anchors": [
     "ringer.py StateWriter.snapshot",
     "ringer.py verdict_for",
