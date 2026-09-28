@@ -105,6 +105,17 @@
       border-bottom: 1px solid var(--hairline);
       gap: 10px;
     }
+    .honesty-strip {
+      display: block;
+      margin: 0;
+      padding: 6px clamp(12px, 2vw, 22px);
+      border-bottom: 1px solid var(--hairline);
+      background: color-mix(in srgb, var(--warn, #a9741c) 14%, transparent);
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.35;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
     .update-banner {
       display: flex;
       align-items: center;
@@ -590,6 +601,7 @@
       <span id="update-message"></span>
       <button id="dismiss-update" type="button" aria-label="Dismiss update notice">×</button>
     </aside>
+    <aside id="snapshot-honesty" class="honesty-strip" role="status">Checking live Ringside data… Enable JavaScript for automatic freshness checks.</aside>
     <header class="corner topbar">
       <span id="top-dot" class="live-dot" aria-hidden="true"></span>
       <div class="topbar-main">
@@ -633,6 +645,10 @@
       artifacts: [],
       runError: null,
       libraryError: null,
+      runsCheckedAt: 0,
+      libraryCheckedAt: 0,
+      runsPending: false,
+      libraryPending: false,
       tab: normalizeTab(localStorage.getItem(TAB_KEY)) || "live",
       hasStoredTab: Boolean(normalizeTab(localStorage.getItem(TAB_KEY))),
       expanded: new Map(),
@@ -689,7 +705,47 @@
       renderUpdateBanner();
     });
 
+    function freshnessView(data, now = Date.now()) {
+      const checks = [data.runsCheckedAt, data.libraryCheckedAt];
+      if (data.runError || data.libraryError) {
+        return {status: "unavailable", text: "Connection interrupted — unable to verify current Ringside data. Retrying automatically."};
+      }
+      if (checks.some(stamp => !stamp)) {
+        return {status: "checking", text: "Checking live Ringside data…"};
+      }
+      const checkedAt = Math.min(...checks);
+      if (now - checkedAt > 10000) {
+        return {status: "unavailable", text: "Connection delayed — last complete data check was more than 10 seconds ago. Retrying automatically."};
+      }
+      const timestamps = [
+        ...data.artifacts.map(item => item.updated_at),
+        ...data.runs.flatMap(run => [run.started_at, run.updated_at, run.finished_at])
+      ].map(value => Date.parse(value || "")).filter(Number.isFinite);
+      const latest = timestamps.length ? Math.max(...timestamps) : null;
+      const checkText = `Checked ${new Date(checkedAt).toLocaleTimeString()}`;
+      if (latest === null) {
+        return {status: "unknown", text: `Connected · No source activity timestamp available · ${checkText}`};
+      }
+      if (latest > now + 300000) {
+        return {status: "unknown", text: `Connected · Source timestamp is in the future; freshness unknown · ${checkText}`};
+      }
+      const age = Math.max(0, (now - latest) / 3600000);
+      const stale = age > 48;
+      return {
+        status: stale ? "stale" : "fresh",
+        text: `Connected · Data ${stale ? "STALE" : "FRESH"} · Latest activity ${new Date(latest).toLocaleString()} (${age.toFixed(1)}h ago; 48h threshold) · ${checkText}`
+      };
+    }
+
+    function renderFreshness() {
+      const view = freshnessView(state);
+      const strip = document.getElementById("snapshot-honesty");
+      strip.textContent = view.text;
+      strip.dataset.freshness = view.status;
+    }
+
     function tickClock() {
+      renderFreshness();
       els.clock.textContent = new Date().toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
@@ -1653,17 +1709,22 @@
     }
 
     async function fetchRuns() {
+      if (state.runsPending) return;
+      state.runsPending = true;
       try {
-        const response = await fetch("/api/runs", {cache: "no-store"});
+        const response = await fetch("/api/runs", {cache: "no-store", signal: AbortSignal.timeout(8000)});
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const payload = await response.json();
         state.runs = normalizeRuns(payload);
         state.active = payload?.active || {};
         state.update = payload?.update || null;
         state.runError = null;
+        state.runsCheckedAt = Date.now();
       } catch (error) {
         state.runError = error?.message || "runs unavailable";
       }
+      state.runsPending = false;
+      renderFreshness();
       renderTop();
       renderUpdateBanner();
       renderRunningNow();
@@ -1671,15 +1732,20 @@
     }
 
     async function fetchLibrary() {
+      if (state.libraryPending) return;
+      state.libraryPending = true;
       try {
-        const response = await fetch("/api/library", {cache: "no-store"});
+        const response = await fetch("/api/library", {cache: "no-store", signal: AbortSignal.timeout(8000)});
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const payload = await response.json();
         state.artifacts = normalizeLibrary(payload);
         state.libraryError = null;
+        state.libraryCheckedAt = Date.now();
       } catch (error) {
         state.libraryError = error?.message || "library unavailable";
       }
+      state.libraryPending = false;
+      renderFreshness();
       renderTop();
       renderArtifacts();
       renderArtifactControls();
