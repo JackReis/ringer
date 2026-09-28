@@ -25,6 +25,10 @@
     {
       "path": "docs/RECEIPTS.md",
       "answers": "which_host enum, fail-closed new writes, Multica stamp bar, and grandfathered historical snapshots."
+    },
+    {
+      "path": "docs/agent-memory/DUNE-IMPORT-BANS.md",
+      "answers": "Dune §3 import-graph edges for Ringer planes, the FAIL-closed CI gate, and stamped waivers. AEGI-178."
     }
   ],
   "state_root": {
@@ -232,6 +236,8 @@
     "ringer.py EvalLogger.log_attempt",
     "ringer.py _harvest_deliverables_on_pass",
     "ringer.py PersistentHudServer",
+    "checks/dune_import_ban.py",
+    "docs/agent-memory/DUNE-IMPORT-BANS.md",
     "docs/TAXONOMY.md",
     "docs/STEERING.md",
     ".claude/skills/ringer/SKILL.md"

@@ -21,6 +21,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Dune import-graph (FAIL-closed)
+        run: python3 checks/dune_import_ban.py
       - name: Run test suite
         env:
           RINGER_NO_SELF_UPDATE: "1"
