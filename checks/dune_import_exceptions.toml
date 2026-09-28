@@ -1,0 +1,8 @@
+schema = "ringer.dune-import-exceptions/v1"
+
+# Stamped waivers only. An empty list is the closed default.
+# Each [[exceptions]] table needs edge, path, pattern, stamp, and reason.
+# A stamp that matches nothing fails the gate (stale waiver).
+# Exceptions cannot waive the policy file or a missing edge.
+
+exceptions = []

@@ -1,0 +1,122 @@
+schema = "ringer.dune-import-ban/v1"
+
+# Dune di Jaggo §3, adapted to Ringer.
+# Vault: Architecture/fleet/DUNE-ELECTRON-VAULT-DOCTRINE-20260927.md
+# Card AEGI-178 (01a0e545-edc9-793d-be5f-2b1258ad9449)
+# Baton 01a0e5b2-e7d3-7dda-9c88-0c348a62797a
+# The four edges below are mandatory. Removing one fails the gate.
+
+[planes.privileged_host]
+role = "Python orchestrator and Ringside host. May read config, secret env files, and state."
+globs = [
+  "ringer.py",
+  "hud/src/**/*.rs",
+  "scripts/**/*.py",
+  "scripts/**/*.sh",
+  "checks/engine-bin-probe.py",
+]
+
+[planes.unprivileged_ui]
+role = "Ringside pages. Render, same-origin board GETs, and sanctioned Tauri IPC only."
+globs = [
+  "dashboard/**/*.html",
+  "dashboard/**/*.js",
+  "hud/frontend/**/*.js",
+  "hud/frontend/**/*.html",
+]
+
+[planes.unprivileged_python]
+role = "Worker checks, the mock engine, and the nudge hook. Must not import the orchestrator."
+globs = [
+  "templates/**/*.py",
+  "engines/**/*.py",
+  "hooks/**/*.py",
+]
+
+[planes.verification]
+role = "Tests may import the orchestrator so the check can execute."
+globs = ["tests/**/*.py"]
+
+[planes.native_shell]
+role = "Tauri webview shell. One host event feed. Not a second board client."
+globs = [
+  "hud/frontend/**/*.js",
+  "hud/frontend/**/*.html",
+]
+
+[edges.unprivileged_to_privileged]
+from_planes = ["unprivileged_ui", "unprivileged_python"]
+banned_modules = ["ringer"]
+banned_specifiers = [
+  "ringer",
+  "ringer.py",
+  "fs",
+  "node:fs",
+  "node:child_process",
+  "child_process",
+  "@tauri-apps/plugin-fs",
+  "@tauri-apps/plugin-shell",
+]
+
+[edges.shortcut_ipc_skip]
+ui_planes = ["unprivileged_ui"]
+rust_glob = "hud/src/**/*.rs"
+capabilities_glob = "hud/capabilities/**/*.json"
+tauri_conf = "hud/tauri.conf.json"
+allowed_permission_prefixes = ["core:default", "core:window:"]
+asset_scope_must_contain = "artifacts"
+asset_scope_banned_substrings = ["config.toml", ".env", "secrets"]
+# The one forwarding call inside function tauriInvoke. Any other TAURI_INVOKE( is a skip.
+sanctioned_forward = "TAURI_INVOKE(command, args)"
+banned_substrings = [
+  "__TAURI_INTERNALS__",
+  "ipc://",
+  "@tauri-apps/plugin-fs",
+  "@tauri-apps/plugin-shell",
+  "plugin:fs",
+  "plugin:shell",
+  "readTextFile",
+  "readFile(",
+]
+
+[edges.secret_readers_in_ui]
+planes = ["unprivileged_ui", "unprivileged_python"]
+banned_substrings = [
+  "config.toml",
+  "parse_env_file",
+  "env_file",
+  "SUPABASE_DB_",
+  ".supabase.env",
+  "process.env",
+  "~/.config/ringer",
+  "api_key",
+  "API_KEY",
+  "apiKey",
+  "private_key",
+  "credentials",
+]
+
+[edges.parallel_board_clients]
+ui_planes = ["unprivileged_ui"]
+native_shell_plane = "native_shell"
+board_owner = "ringer.py"
+board_symbols = ["PersistentHudServer", "ReusableThreadingHTTPServer"]
+ui_banned_substrings = [
+  "new WebSocket",
+  "EventSource(",
+  "mqtt://",
+  "ws://",
+  "wss://",
+  ":8700",
+  ":8787",
+]
+native_shell_banned_substrings = [
+  "fetch(",
+  "new WebSocket",
+  "EventSource(",
+  "mqtt://",
+  "ws://",
+  "wss://",
+  ":8700",
+  ":8787",
+]
