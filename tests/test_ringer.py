@@ -47,6 +47,7 @@ class RingerCliTests(unittest.TestCase):
     def write_config(self, engines: dict[str, list[str]], *, port: int = 18787) -> None:
         lines = [
             f'state_dir = "{self.state_dir}"',
+            'which_host = "aegis"',
             f"dashboard_port_base = {port}",
             "allow_full_access = false",
             "",

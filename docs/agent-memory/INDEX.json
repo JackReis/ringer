@@ -21,6 +21,10 @@
     {
       "path": "docs/agent-memory/SIMPLIFICATIONS.md",
       "answers": "The three-question read, collapsed status words, and surfaces that stay on disk."
+    },
+    {
+      "path": "docs/RECEIPTS.md",
+      "answers": "which_host enum, fail-closed new writes, Multica stamp bar, and grandfathered historical snapshots."
     }
   ],
   "state_root": {
@@ -69,6 +73,7 @@
         "run_id",
         "run_name",
         "identity",
+        "which_host",
         "state",
         "finished",
         "pid",

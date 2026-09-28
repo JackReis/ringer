@@ -64,6 +64,7 @@ class StateWriterConcurrencyTests(unittest.TestCase):
             datetime(2026, 7, 28, tzinfo=timezone.utc),
             [runtime],
             threading.RLock(),
+            which_host="aegis",
         )
 
     def test_parallel_flushes_never_lose_their_temp_file(self) -> None:

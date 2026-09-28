@@ -36,6 +36,7 @@ class MockEngineEndToEndTests(unittest.TestCase):
                 "\n".join(
                     [
                         f"state_dir = {toml_string(state_dir)}",
+                        'which_host = "aegis"',
                         "",
                         "[eval]",
                         'backend = "jsonl"',

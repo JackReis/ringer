@@ -8,7 +8,7 @@ The receipt files are complete on purpose: raw logs, full specs, HTML pages, a d
 2. **Did the check pass?** Task `verdict == "PASS"` and `check_returncode == 0`. Library `pass` means every task passed. `ask` passing means the answer file was non-empty.
 3. **Who earned the lane?** `first_try_pass_rate` for this machine, this `task_type`, from `./ringer.py models --json`. Median tokens and duration are the cost. `docs/MODEL-NOTES.md` is the one-line judgment.
 
-Anything that does not serve those three stays on disk.
+Anything that does not serve those three stays on disk. The Multica comment before done still cites `runs/<run_id>` and `which_host` from the snapshot. That pin is not a fourth routing question. It stops the card from being read as a different host. See `docs/RECEIPTS.md`.
 
 ## Collapse the words
 
@@ -22,6 +22,7 @@ Map with the table in `HARVEST.md`. Treat `error` and `timeout` as `fail` on the
 
 | Need | Read | Skip |
 |---|---|---|
+| Host | `which_host` on `runs/<run_id>.json` | hostname, notes-path guesses, aliases (`scratch`, `vault`) |
 | Label | `spec_short` or task `key` | Full `spec`, unless you are reviewing the brief |
 | Why it failed | `check_output_tail` (4,000 chars) | `notes` in the JSONL row, then the worker log |
 | Live activity | `activity`, else last line of `log_tail` (3 lines) | `log_tail_full` (40 lines) unless the activity line is empty |

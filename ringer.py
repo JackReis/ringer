@@ -47,6 +47,10 @@ from typing import Any, Iterable
 TOOL_NAME = "ringer"
 STATE_DIR_NAME = ".ringer"
 ENV_VAR_PREFIX = "RINGER"
+# Locked receipt host. Exact strings only — never a hostname, alias, or path.
+WHICH_HOSTS = frozenset({"aegis", "talaris", "box"})
+WHICH_HOST_LANE_SHELL = "registered-machine-shell"
+WHICH_HOST_LANE_SCRATCH = "scratch"
 
 CONFIG_DIR_NAME = TOOL_NAME
 CONFIG_FILE_NAME = "config.toml"
@@ -1048,6 +1052,7 @@ class AppConfig:
     artifact: ArtifactConfig
     steering: SteeringConfig = field(default_factory=SteeringConfig)
     update: UpdateConfig = field(default_factory=UpdateConfig)
+    which_host: str | None = None
 
     @classmethod
     def load(cls, path: Path | None = None) -> "AppConfig":
@@ -1069,6 +1074,8 @@ class AppConfig:
             raise ValueError("dashboard_port_base must be positive")
         hud_port = load_hud_port(data.get("hud"))
         identity_default = optional_string(data.get("identity_default"))
+        which_host_raw = data.get("which_host", None)
+        which_host = None if which_host_raw is None else validate_which_host(which_host_raw)
         hud_app_path = optional_path(data.get("hud_app_path"))
         allow_full_access = bool(data.get("allow_full_access", False))
         eval_config = load_eval_config(data.get("eval"), state_dir)
@@ -1094,6 +1101,7 @@ class AppConfig:
             artifact=artifact_config,
             steering=steering_config,
             update=update_config,
+            which_host=which_host,
         )
 
 
@@ -2187,6 +2195,7 @@ class StateWriter:
         max_parallel: int = 1,
         artifact: ArtifactConfig | None = None,
         path: Path | None = None,
+        which_host: str | None = None,
     ) -> None:
         self.run_id = run_id
         self.run_name = run_name
@@ -2198,6 +2207,9 @@ class StateWriter:
         self.max_parallel = max_parallel
         self.state_dir = state_dir
         self.path = path or (state_dir / "runs" / f"{run_id}.json")
+        # None is refused at flush. A present value is checked immediately so a
+        # typo never reaches the receipt file.
+        self.which_host = None if which_host is None else validate_which_host(which_host)
         self.pid = os.getpid()
         self.port: int | None = None
         self.finished = False
@@ -2262,6 +2274,7 @@ class StateWriter:
         return state
 
     def snapshot(self) -> dict[str, Any]:
+        host = validate_which_host(self.which_host)
         now = time.monotonic()
         children, commands = ProcessTree.read()
         with self.lock:
@@ -2335,6 +2348,7 @@ class StateWriter:
                 "run_id": self.run_id,
                 "run_name": self.run_name,
                 "identity": self.identity,
+                "which_host": host,
                 "state": "finished" if self.finished else "live",
                 "pid": self.pid,
                 "port": self.port,
@@ -8679,10 +8693,12 @@ class RingerRunner:
         identity: str,
         dashboard_enabled: bool = True,
         force_browser: bool = False,
+        which_host: str | None = None,
     ) -> None:
         self.manifest = manifest
         self.config = config
         self.identity = identity
+        self.which_host = None if which_host is None else validate_which_host(which_host)
         self.dashboard_enabled = dashboard_enabled
         self.run_id = build_run_id(manifest.run_name)
         self.started_at = datetime.now(timezone.utc)
@@ -8699,6 +8715,7 @@ class RingerRunner:
             self.lock,
             max_parallel=manifest.max_parallel,
             artifact=config.artifact,
+            which_host=self.which_host,
         )
         self.dashboard = (
             Dashboard(
@@ -8744,7 +8761,7 @@ class RingerRunner:
             if self.dashboard is not None:
                 self.dashboard.stop()
             self.logger.close()
-            print_summary(self.run_id, self.runtimes)
+            print_summary(self.run_id, self.runtimes, self.which_host)
             print("Model log updated; run './ringer.py models' for the per-model scoreboard.")
             # The post-run journey: tell a human exactly where the results live.
             with contextlib.suppress(Exception):
@@ -9392,6 +9409,125 @@ def find_repo_identity(start: Path | None = None) -> str | None:
     return None
 
 
+class WhichHostError(ValueError):
+    """which_host failed closed: missing, empty, or outside the locked enum."""
+
+
+def validate_which_host(value: object) -> str:
+    """Accept exactly aegis, talaris, or box. Anything else fails closed."""
+    if isinstance(value, str) and value in WHICH_HOSTS:
+        return value
+    raise WhichHostError(
+        "which_host must be exactly one of: aegis, talaris, box "
+        f"(got {value!r}). "
+        "Missing, empty, aliases, and hostname strings are rejected. "
+        "box is Scratch and is never a vault or host fork."
+    )
+
+
+def which_host_lane(which_host: str) -> str:
+    """Shell lane cited on a Multica stamp.
+
+    aegis and talaris are host-craft on a registered machine.
+    box stays scratch and is never cited as those hosts.
+    """
+    host = validate_which_host(which_host)
+    if host == "box":
+        return WHICH_HOST_LANE_SCRATCH
+    return WHICH_HOST_LANE_SHELL
+
+
+def which_host_is_registered_shell(which_host: str) -> bool:
+    return which_host_lane(which_host) == WHICH_HOST_LANE_SHELL
+
+
+def format_multica_stamp(run_id: str, which_host: str, prover_tip: str | None = None) -> str:
+    """Comment token Multica must include before done: runs/<id> + which_host."""
+    host = validate_which_host(which_host)
+    if not isinstance(run_id, str) or not run_id or run_id != run_id.strip() or "/" in run_id:
+        raise WhichHostError("multica stamp run_id must be the receipt id, cited as runs/<id>")
+    parts = [
+        f"runs/{run_id}",
+        f"which_host={host}",
+        f"lane={which_host_lane(host)}",
+    ]
+    if prover_tip is not None:
+        if (
+            not isinstance(prover_tip, str)
+            or not prover_tip
+            or any(ch.isspace() for ch in prover_tip)
+        ):
+            raise WhichHostError("prover tip must be a single token when provided")
+        parts.append(f"prover={prover_tip}")
+    return " ".join(parts)
+
+
+def resolve_which_host(cli_value: str | None, config_value: str | None) -> str:
+    """First explicitly set source wins. Invalid values do not fall through.
+
+    Order: --which-host, then RINGER_WHICH_HOST, then config which_host.
+    The machine hostname is never consulted.
+    """
+    env_name = f"{ENV_VAR_PREFIX}_WHICH_HOST"
+    sources: list[tuple[str, object]] = []
+    if cli_value is not None:
+        sources.append(("--which-host", cli_value))
+    if env_name in os.environ:
+        sources.append((env_name, os.environ.get(env_name)))
+    if config_value is not None:
+        sources.append(("config which_host", config_value))
+    if not sources:
+        raise WhichHostError(
+            "which_host is required for a new run receipt. "
+            "Pass --which-host aegis|talaris|box, set RINGER_WHICH_HOST, "
+            "or set which_host in config.toml. "
+            "Ringer does not infer which_host from the machine hostname."
+        )
+    label, raw = sources[0]
+    try:
+        return validate_which_host(raw)
+    except WhichHostError as exc:
+        raise WhichHostError(f"{label}: {exc}") from exc
+
+
+def lint_run_receipt(data: object, *, require_which_host: bool) -> list[str]:
+    """Check one run snapshot.
+
+    New writes always carry a valid which_host. A historical snapshot may omit
+    the field: that is a WARN unless require_which_host is set. A present value
+    outside the enum is always an ERROR. This does not rewrite the file.
+    """
+    if not isinstance(data, dict):
+        return ["ERROR: receipt is not a JSON object"]
+    if "which_host" not in data or data.get("which_host") is None:
+        message = (
+            "which_host is missing "
+            "(grandfathered historical receipt; new writes must include it)"
+        )
+        prefix = "ERROR" if require_which_host else "WARN"
+        return [f"{prefix}: {message}"]
+    try:
+        validate_which_host(data.get("which_host"))
+    except WhichHostError as exc:
+        return [f"ERROR: {exc}"]
+    return []
+
+
+def lint_run_receipt_files(runs_dir: Path, *, require_which_host: bool) -> list[str]:
+    if not runs_dir.is_dir():
+        return []
+    findings: list[str] = []
+    for path in sorted(runs_dir.glob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            findings.append(f"{path.name}: ERROR: receipt is not JSON")
+            continue
+        for item in lint_run_receipt(data, require_which_host=require_which_host):
+            findings.append(f"{path.name}: {item}")
+    return findings
+
+
 def resolve_identity(
     value: str | None,
     config: AppConfig,
@@ -10011,10 +10147,12 @@ def dry_run(
     identity: str,
     dashboard_enabled: bool,
     force_browser: bool,
+    which_host: str,
 ) -> None:
     print("DRY RUN: no codex workers will be spawned.")
     print(f"Run: {manifest.run_name}")
     print(f"Identity: {identity}")
+    print(f"Which host: {validate_which_host(which_host)}")
     print(f"Config: {config.path if config.path else '(safe defaults)'}")
     print(f"Workdir: {manifest.workdir}")
     print(f"Max parallel: {manifest.max_parallel}")
@@ -10075,9 +10213,15 @@ def print_lint_findings(findings: list[str]) -> None:
         print(f"lint: {finding}")
 
 
-def print_summary(run_id: str, runtimes: list[TaskRuntime]) -> None:
+def print_summary(
+    run_id: str,
+    runtimes: list[TaskRuntime],
+    which_host: str | None = None,
+) -> None:
     print("\nSummary")
     print(f"run_id: {run_id}")
+    if which_host is not None:
+        print(f"which_host: {which_host}")
     header = f"{'task':<24} {'status':<8} {'verdict':<8} {'attempts':>8} {'tokens':>10} {'elapsed_s':>10}"
     print(header)
     print("-" * len(header))
@@ -10302,7 +10446,9 @@ def run_one_request(config: AppConfig, args: argparse.Namespace) -> int:
         (workdir / "packet.txt").write_text(packet.text, encoding="utf-8")
     packet.write_report(workdir / "packet-report.json")
     print_packet_report(packet, workdir)
+    which_host = resolve_which_host(getattr(args, "which_host", None), config.which_host)
     if args.dry_run:
+        print(f"which_host: {which_host}")
         print("No model call was made.")
         return 0
 
@@ -10331,6 +10477,7 @@ def run_one_request(config: AppConfig, args: argparse.Namespace) -> int:
             identity=identity,
             dashboard_enabled=True,
             force_browser=False,
+            which_host=which_host,
         )
     )
     answer_path = workdir / "answer" / "answer.md"
@@ -10536,6 +10683,7 @@ async def run_manifest(
     identity: str,
     dashboard_enabled: bool,
     force_browser: bool,
+    which_host: str,
 ) -> int:
     runner = RingerRunner(
         manifest,
@@ -10543,6 +10691,7 @@ async def run_manifest(
         identity=identity,
         dashboard_enabled=dashboard_enabled,
         force_browser=force_browser,
+        which_host=validate_which_host(which_host),
     )
     register_active_run(
         runner.run_id,
@@ -10767,6 +10916,32 @@ def run_persistent_hud(config: AppConfig, *, port: int | None, open_viewer: bool
 
 
 
+def run_check_receipts_command(config: AppConfig, args: argparse.Namespace) -> int:
+    state_dir = (
+        args.state_dir.expanduser()
+        if getattr(args, "state_dir", None) is not None
+        else config.state_dir
+    )
+    runs_dir = state_dir / "runs"
+    require = bool(getattr(args, "strict", False))
+    findings = lint_run_receipt_files(runs_dir, require_which_host=require)
+    scanned = len(list(runs_dir.glob("*.json"))) if runs_dir.is_dir() else 0
+    for finding in findings:
+        print(f"check-receipts: {finding}")
+    errors = [finding for finding in findings if ": ERROR:" in finding]
+    if errors:
+        return 1
+    warnings = len(findings) - len(errors)
+    if warnings:
+        print(
+            f"check-receipts: {warnings} grandfathered missing which_host "
+            f"({scanned} receipts)"
+        )
+        return 0
+    print(f"check-receipts: clean ({scanned} receipts)")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ringer.py",
@@ -10796,6 +10971,13 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--config", type=Path, default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     run_parser.add_argument("--max-parallel", type=int, help="override manifest max_parallel")
     run_parser.add_argument("--identity", help="orchestrator identity for HUD state and eval rows")
+    run_parser.add_argument(
+        "--which-host",
+        help=(
+            "receipt host, exactly aegis, talaris, or box "
+            "(else RINGER_WHICH_HOST, else config which_host; fail closed)"
+        ),
+    )
     run_parser.add_argument("--no-dashboard", action="store_true", help="disable live dashboard")
     run_parser.add_argument("--browser", action="store_true", help="open the dashboard in the browser instead of Ringside")
     run_parser.epilog = "Set RINGER_NO_CATALOG_REFRESH=1 to skip the non-blocking OpenRouter catalog auto-refresh."
@@ -10915,6 +11097,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="orchestrator identity for the local run record",
     )
     ask_parser.add_argument(
+        "--which-host",
+        help=(
+            "receipt host, exactly aegis, talaris, or box "
+            "(else RINGER_WHICH_HOST, else config which_host; fail closed)"
+        ),
+    )
+    ask_parser.add_argument(
         "--dry-run",
         action="store_true",
         help=(
@@ -10974,6 +11163,13 @@ def build_parser() -> argparse.ArgumentParser:
     demo_parser.add_argument("--config", type=Path, default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     demo_parser.add_argument("--max-parallel", type=int, help="override demo max_parallel")
     demo_parser.add_argument("--identity", help="orchestrator identity for HUD state and eval rows")
+    demo_parser.add_argument(
+        "--which-host",
+        help=(
+            "receipt host, exactly aegis, talaris, or box "
+            "(else RINGER_WHICH_HOST, else config which_host; fail closed)"
+        ),
+    )
     demo_parser.add_argument("--no-dashboard", action="store_true", help="disable live dashboard")
     demo_parser.add_argument("--browser", action="store_true", help="open the dashboard in the browser instead of Ringside")
     demo_parser.add_argument(
@@ -10988,6 +11184,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     uninstall_parser = subparsers.add_parser("uninstall-agent", help="remove the ringer Claude Code skill and hooks")
     uninstall_parser.add_argument("--project", action="store_true", help="remove from ./.claude instead of ~/.claude")
+
+    receipts_parser = subparsers.add_parser(
+        "check-receipts",
+        help="lint run snapshots for which_host (historical misses warn unless --strict)",
+    )
+    receipts_parser.add_argument("--config", type=Path, default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+    receipts_parser.add_argument(
+        "--state-dir",
+        type=Path,
+        help="state root whose runs/ directory to scan (default: config state_dir)",
+    )
+    receipts_parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="treat a missing which_host as an error (new-write gate; default grandfathers it)",
+    )
     return parser
 
 
@@ -11063,6 +11275,8 @@ def main(argv: list[str] | None = None) -> int:
                 port=args.port,
                 open_viewer=not args.no_open,
             )
+        if args.command == "check-receipts":
+            return run_check_receipts_command(config, args)
         if args.command == "ask":
             if args.timeout_s <= 0:
                 raise ValueError("--timeout-s must be positive")
@@ -11092,6 +11306,7 @@ def main(argv: list[str] | None = None) -> int:
         if manifest.source_path is not None:
             identity_start_paths.append(manifest.source_path.parent)
         identity = resolve_identity(args.identity, config, identity_start_paths)
+        which_host = resolve_which_host(getattr(args, "which_host", None), config.which_host)
         dashboard_enabled = not args.no_dashboard
         if getattr(args, "no_artifact", False) and config.artifact.enabled:
             config = dataclass_replace(config, artifact=dataclass_replace(config.artifact, enabled=False))
@@ -11102,6 +11317,7 @@ def main(argv: list[str] | None = None) -> int:
                 identity=identity,
                 dashboard_enabled=dashboard_enabled,
                 force_browser=args.browser,
+                which_host=which_host,
             )
             return 0
         if getattr(args, "baseline", False):
@@ -11120,6 +11336,7 @@ def main(argv: list[str] | None = None) -> int:
                 identity=identity,
                 dashboard_enabled=dashboard_enabled,
                 force_browser=args.browser,
+                which_host=which_host,
             )
         )
     except KeyboardInterrupt:
