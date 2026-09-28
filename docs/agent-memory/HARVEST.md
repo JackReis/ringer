@@ -71,7 +71,9 @@ The native Ringside.app under `hud/` recomputes `died` on its own (unfinished, p
 
 ## Run snapshot fields an agent keeps
 
-Top level: `run_id`, `run_name`, `identity`, `state`, `finished`, `pid`, `started_at`, `elapsed_s`, `max_parallel`, `totals`, `summary`, `pass`, `fail`, `tokens`, `report_ready`, `live_path`, `report_path`.
+Top level: `run_id`, `run_name`, `identity`, `which_host`, `state`, `finished`, `pid`, `started_at`, `elapsed_s`, `max_parallel`, `totals`, `summary`, `pass`, `fail`, `tokens`, `report_ready`, `live_path`, `report_path`.
+
+`which_host` is exactly `aegis`, `talaris`, or `box` on every new snapshot. It is not the orchestrator identity and not a hostname. Old snapshots may omit it (grandfathered). A value outside the enum is invalid on old and new files. The Multica stamp and the Shell-lane rule are in [`docs/RECEIPTS.md`](../RECEIPTS.md).
 
 `run_id` shape: `<sanitized-run_name>-<UTC yyyymmddThhmmssZ>-p<pid>`.
 
@@ -103,6 +105,7 @@ One card, one deliverable. The deliverable is a pointer, small enough to re-read
 
 - `run_name` (the job, stable across rounds)
 - `run_id` of the round you are accepting
+- `which_host` from that round's `runs/<run_id>.json`, cited with the pointer before done: `runs/<run_id> which_host=<aegis|talaris|box>` (optional `prover=<tip>`). `aegis` and `talaris` cite registered-machine Shell; `box` stays scratch. See [`docs/RECEIPTS.md`](../RECEIPTS.md).
 - library `state` (`pass`, `fail`, or `died`)
 - `tasks_pass`, `tasks_fail`
 - deliverable `name` + `path` for each file the card claims

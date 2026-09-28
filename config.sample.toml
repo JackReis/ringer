@@ -7,6 +7,12 @@
 # value > short hostname.
 # identity_default = "codex-mini"
 
+# Receipt host stamped into runs/<run_id>.json. Fail-closed: exactly one of
+# aegis (runtime/mirror), talaris (vault SSOT), or box (Scratch — never a
+# vault or host fork). Resolution: --which-host > RINGER_WHICH_HOST > this
+# key. Ringer does not infer it from the hostname. See docs/RECEIPTS.md.
+# which_host = "aegis"
+
 # State files live under <state_dir>/runs/<run_id>.json.
 state_dir = "~/.ringer"
 

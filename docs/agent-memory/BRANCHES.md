@@ -44,6 +44,10 @@ Every receipt is stamped with the orchestrator identity. That stamp is how Rings
 
 Memory keys include `identity` beside `run_name`. Two identities can legally use the same `run_name`; they still share one library entry because the library key is `run_name` alone. The entry's `identity` and `current_run_id` are whoever wrote last. When that collision is possible, bind the card to `run_id`, not to the shared name.
 
+## Host lane
+
+`which_host` is a separate pin from identity: exactly `aegis`, `talaris`, or `box` on each new `runs/<run_id>.json`. The Multica comment before done cites `runs/<run_id>` and that field. Host-craft (`aegis`, `talaris`) cites registered-machine Shell. `box` is Scratch and stays scratch in the stamp. Contract: `docs/RECEIPTS.md`.
+
 ## Model lane
 
 The manifest field `engine` selects the harness block in config. The manifest field `model` selects the model inside a harness that has a `{model}` placeholder. OpenCode is that harness for OpenRouter slugs. Codex and Grok Build are first-class harnesses. Cloning an engine block or hiding the model in `engine_args` makes the receipt lie about who typed.

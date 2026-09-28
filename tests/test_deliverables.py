@@ -142,6 +142,7 @@ class DeliverableTests(unittest.TestCase):
             self.config,
             "test-agent",
             dashboard_enabled=False,
+            which_host="aegis",
         )
 
     def runtime_for(self, task: TaskSpec, *, worktrees: bool = False) -> tuple[RingerRunner, TaskRuntime]:
@@ -416,6 +417,7 @@ class DeliverableTests(unittest.TestCase):
             [runtime],
             threading.RLock(),
             artifact=self.artifact,
+            which_host="aegis",
         )
 
         writer.finish()

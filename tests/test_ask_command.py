@@ -46,6 +46,7 @@ class AskCommandTests(unittest.TestCase):
             "\n".join(
                 [
                     f"state_dir = {toml_string(root / 'state')}",
+                    'which_host = "aegis"',
                     "",
                     "[eval]",
                     'backend = "jsonl"',
@@ -131,6 +132,8 @@ class AskCommandTests(unittest.TestCase):
                     str(workdir),
                     "--keep-packet",
                     "--dry-run",
+                    "--which-host",
+                    "aegis",
                 ]
             )
 

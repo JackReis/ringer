@@ -251,6 +251,7 @@ class ModelValidationTests(unittest.TestCase):
             config=config,
             identity="tester",
             dashboard_enabled=False,
+            which_host="aegis",
         )
         runtime = runner.runtimes[0]
         runtime.last_worker_command = ["codex", "exec", "-m", "gpt-5.6-sol", "do it"]

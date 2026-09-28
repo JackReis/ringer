@@ -79,6 +79,7 @@ class LogEndpointTests(unittest.TestCase):
             datetime(2026, 7, 5, tzinfo=timezone.utc),
             [runtime],
             threading.RLock(),
+            which_host="aegis",
         )
 
     def test_dashboard_serves_worker_log_tail_by_task_key_only(self) -> None:
