@@ -35,7 +35,7 @@ import urllib.parse
 import urllib.request
 import webbrowser
 from dataclasses import asdict, dataclass, field, replace as dataclass_replace
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from html import escape as html_escape
 from http import HTTPStatus
@@ -51,6 +51,27 @@ ENV_VAR_PREFIX = "RINGER"
 WHICH_HOSTS = frozenset({"aegis", "talaris", "box"})
 WHICH_HOST_LANE_SHELL = "registered-machine-shell"
 WHICH_HOST_LANE_SCRATCH = "scratch"
+# Weekly receipts-plane gate. Axis ids are locked.
+SCORECARD_AXIS_SOT_DRIFT = "sot_drift"
+SCORECARD_AXIS_AGENT_MEMORY_FRESHNESS = "agent_memory_freshness"
+SCORECARD_DEFAULT_MAX_AGE_DAYS = 7
+SCORECARD_MAX_AGE_ENV = f"{ENV_VAR_PREFIX}_SCORECARD_MAX_AGE_DAYS"
+_SCORECARD_INDEX = "docs/agent-memory/INDEX.json"
+_SCORECARD_RECEIPTS = "docs/RECEIPTS.md"
+_SCORECARD_DOC = "docs/SCORECARD.md"
+_SCORECARD_HARVEST = "docs/agent-memory/HARVEST.md"
+_SCORECARD_CONTRACT_FILES = (
+    "docs/RECEIPTS.md",
+    "docs/SCORECARD.md",
+    "docs/agent-memory/HARVEST.md",
+    "docs/agent-memory/BRANCHES.md",
+    "docs/agent-memory/SIMPLIFICATIONS.md",
+    "docs/agent-memory/INDEX.json",
+)
+_SCORECARD_STAMP_ENUM = re.compile(r"which_host=<([a-z0-9_|-]+)>")
+_SCORECARD_WHICH_HOST_VALUE = re.compile(r"which_host=([A-Za-z0-9_.-]+)")
+_SCORECARD_BOX_AS_SHELL = re.compile(r"which_host=box\s+lane=registered-machine-shell")
+_SCORECARD_FLEET_KEYS = ("skill", "vault_path", "doctrine", "fleet_sot_map")
 
 CONFIG_DIR_NAME = TOOL_NAME
 CONFIG_FILE_NAME = "config.toml"
@@ -10916,6 +10937,467 @@ def run_persistent_hud(config: AppConfig, *, port: int | None, open_viewer: bool
 
 
 
+def _scorecard_repo_file(repo: Path, relative: str) -> Path | None:
+    """Resolve a repo-relative path. None when it escapes the root."""
+    if not isinstance(relative, str) or not relative or relative.startswith(("/", "\\")) or "\\" in relative:
+        return None
+    root = repo.resolve()
+    candidate = (root / relative).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None
+    return candidate
+
+
+def _read_scorecard_text(path: Path) -> tuple[str | None, str | None]:
+    try:
+        return path.read_text(encoding="utf-8"), None
+    except (OSError, UnicodeError) as exc:
+        return None, str(exc)
+
+
+def _which_host_lane_agreement() -> list[str]:
+    """Code lane map: box stays scratch; aegis and talaris stay Shell."""
+    findings: list[str] = []
+    try:
+        if which_host_lane("box") != WHICH_HOST_LANE_SCRATCH:
+            findings.append(
+                "ERROR: which_host lane for box is not scratch; "
+                "box must not masquerade as talaris or aegis"
+            )
+        for host in ("aegis", "talaris"):
+            if which_host_lane(host) != WHICH_HOST_LANE_SHELL:
+                findings.append(
+                    f"ERROR: which_host lane for {host} is not {WHICH_HOST_LANE_SHELL}"
+                )
+    except WhichHostError as exc:
+        findings.append(f"ERROR: which_host lane check failed closed: {exc}")
+    return findings
+
+
+def _locked_enum_findings(text: str, relative: str) -> list[str]:
+    lines = text.splitlines()
+    start = None
+    for index, line in enumerate(lines):
+        if line.strip() == "## Locked enum":
+            start = index + 1
+            break
+    if start is None:
+        return [f"ERROR: {relative} has no ## Locked enum section"]
+    found: set[str] = set()
+    for line in lines[start:]:
+        if line.startswith("## "):
+            break
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            continue
+        cell = stripped.strip("|").split("|", 1)[0].strip()
+        match = re.fullmatch(r"`([a-z0-9_-]+)`", cell)
+        if match:
+            found.add(match.group(1))
+    if found != set(WHICH_HOSTS):
+        return [
+            f"ERROR: {relative} locked enum {sorted(found)} "
+            f"!= code WHICH_HOSTS {sorted(WHICH_HOSTS)}"
+        ]
+    return []
+
+
+def _exactly_enum_findings(text: str, relative: str, *, required: bool) -> list[str]:
+    found: list[tuple[int, set[str]]] = []
+    for lineno, line in enumerate(text.splitlines(), 1):
+        if "which_host" not in line or "exactly" not in line:
+            continue
+        hosts = set(re.findall(r"`([a-z0-9_-]+)`", line))
+        hosts.discard("which_host")
+        if not hosts:
+            continue
+        found.append((lineno, hosts))
+    findings: list[str] = []
+    if required and not found:
+        findings.append(f"ERROR: {relative} does not lock which_host to the code enum")
+    for lineno, hosts in found:
+        if hosts != set(WHICH_HOSTS):
+            findings.append(
+                f"ERROR: {relative}:{lineno} which_host enum {sorted(hosts)} "
+                f"!= code WHICH_HOSTS {sorted(WHICH_HOSTS)}"
+            )
+    return findings
+
+
+def _stamp_bar_findings(text: str, relative: str, *, required: bool) -> list[str]:
+    findings: list[str] = []
+    stamps = list(_SCORECARD_STAMP_ENUM.finditer(text))
+    if required and not stamps:
+        findings.append(
+            f"ERROR: {relative} is missing the Multica stamp bar "
+            "which_host=<aegis|talaris|box>"
+        )
+    code_hosts = set(WHICH_HOSTS)
+    for match in stamps:
+        parts = {part.strip() for part in match.group(1).split("|") if part.strip()}
+        if parts != code_hosts:
+            findings.append(
+                f"ERROR: {relative} stamp which_host=<{match.group(1)}> "
+                f"!= code WHICH_HOSTS {sorted(WHICH_HOSTS)}"
+            )
+    for match in _SCORECARD_WHICH_HOST_VALUE.finditer(text):
+        value = match.group(1)
+        if value not in WHICH_HOSTS:
+            findings.append(
+                f"ERROR: {relative} cites which_host={value}, "
+                f"outside {sorted(WHICH_HOSTS)}"
+            )
+    return findings
+
+
+def _box_masquerade_findings(text: str, relative: str) -> list[str]:
+    findings: list[str] = []
+    for lineno, line in enumerate(text.splitlines(), 1):
+        if _SCORECARD_BOX_AS_SHELL.search(line):
+            findings.append(
+                f"ERROR: {relative}:{lineno} cites which_host=box "
+                "on lane=registered-machine-shell; box stays scratch"
+            )
+    return findings
+
+
+def _scorecard_contract_texts(repo: Path, findings: list[str]) -> dict[str, str]:
+    texts: dict[str, str] = {}
+    for relative in _SCORECARD_CONTRACT_FILES:
+        path = _scorecard_repo_file(repo, relative)
+        if path is None:
+            findings.append(f"ERROR: {relative} escapes the repo")
+            continue
+        if not path.is_file():
+            findings.append(f"ERROR: missing contract file {relative}")
+            continue
+        text, error = _read_scorecard_text(path)
+        if text is None:
+            findings.append(f"ERROR: cannot read {relative}: {error}")
+            continue
+        texts[relative] = text
+    return texts
+
+
+def _index_pointer_findings(repo: Path, index: dict[str, Any]) -> list[str]:
+    findings: list[str] = []
+    docs = index.get("docs")
+    seen: list[str] = []
+    if not isinstance(docs, list):
+        findings.append("ERROR: INDEX.json docs[] is missing")
+    else:
+        for index_i, entry in enumerate(docs):
+            if not isinstance(entry, dict):
+                findings.append(f"ERROR: INDEX.json docs[{index_i}] is not an object")
+                continue
+            relative = entry.get("path")
+            if not isinstance(relative, str) or not relative.strip():
+                findings.append(f"ERROR: INDEX.json docs[{index_i}].path is missing")
+                continue
+            seen.append(relative)
+            path = _scorecard_repo_file(repo, relative)
+            if path is None:
+                findings.append(f"ERROR: INDEX.json docs[] path escapes the repo: {relative}")
+            elif not path.is_file():
+                findings.append(f"ERROR: INDEX.json docs[] path missing: {relative}")
+        for required in (_SCORECARD_RECEIPTS, _SCORECARD_DOC):
+            if required not in seen:
+                findings.append(f"ERROR: INDEX.json docs[] does not point at {required}")
+    fleet = index.get("fleet_information_unification")
+    if not isinstance(fleet, dict):
+        findings.append("ERROR: INDEX.json fleet_information_unification is missing")
+    else:
+        for key in _SCORECARD_FLEET_KEYS:
+            value = fleet.get(key)
+            if not isinstance(value, str) or not value.strip():
+                findings.append(
+                    f"ERROR: fleet_information_unification.{key} pointer is empty"
+                )
+                continue
+            if value.startswith("docs/"):
+                path = _scorecard_repo_file(repo, value)
+                if path is None or not path.is_file():
+                    findings.append(
+                        f"ERROR: fleet_information_unification.{key} path missing: {value}"
+                    )
+        sot_map = fleet.get("fleet_sot_map")
+        if isinstance(sot_map, str) and "Ringer receipts" not in sot_map:
+            findings.append("ERROR: fleet_sot_map drops the Ringer receipts plane")
+        guidelines = fleet.get("trust_guidelines")
+        if not isinstance(guidelines, list) or not any(
+            isinstance(item, str) and item.strip() for item in guidelines
+        ):
+            findings.append("ERROR: fleet_information_unification.trust_guidelines is empty")
+        else:
+            blob = "\n".join(item for item in guidelines if isinstance(item, str))
+            if "./ringer.py scorecard" not in blob:
+                findings.append(
+                    "ERROR: trust guidelines do not block soft-ship on ./ringer.py scorecard"
+                )
+    anchors = index.get("source_anchors")
+    if anchors is not None:
+        if not isinstance(anchors, list):
+            findings.append("ERROR: source_anchors is not a list")
+        else:
+            for anchor in anchors:
+                if not isinstance(anchor, str):
+                    continue
+                if "/" not in anchor or " " in anchor or "<" in anchor:
+                    continue
+                path = _scorecard_repo_file(repo, anchor)
+                if path is None or not path.is_file():
+                    findings.append(f"ERROR: source_anchors path missing: {anchor}")
+    return findings
+
+
+def check_sot_drift(repo: Path) -> list[str]:
+    """ERROR findings when the receipts plane disagrees with itself.
+
+    Prints only. Does not rewrite code, docs, or INDEX.json.
+    """
+    root = repo.expanduser()
+    if not root.is_dir():
+        return [f"ERROR: repo root is not a directory: {root}"]
+    findings = _which_host_lane_agreement()
+    texts = _scorecard_contract_texts(root, findings)
+    receipts = texts.get(_SCORECARD_RECEIPTS)
+    harvest = texts.get(_SCORECARD_HARVEST)
+    scorecard = texts.get(_SCORECARD_DOC)
+    if receipts is not None:
+        findings.extend(_locked_enum_findings(receipts, _SCORECARD_RECEIPTS))
+        if "which_host=box lane=scratch" not in receipts:
+            findings.append(
+                "ERROR: docs/RECEIPTS.md does not cite which_host=box lane=scratch "
+                "(box must stay scratch, never a registered-machine host)"
+            )
+        if "never a vault" not in receipts:
+            findings.append(
+                "ERROR: docs/RECEIPTS.md does not keep box off the vault "
+                "(box is never a vault and never a host fork)"
+            )
+        if "docs/SCORECARD.md" not in receipts or "./ringer.py scorecard" not in receipts:
+            findings.append("ERROR: docs/RECEIPTS.md does not point at ./ringer.py scorecard")
+    if harvest is not None:
+        if not any("box" in line and "scratch" in line for line in harvest.splitlines()):
+            findings.append(
+                "ERROR: docs/agent-memory/HARVEST.md does not keep box on the scratch lane"
+            )
+        if "docs/SCORECARD.md" not in harvest or "./ringer.py scorecard" not in harvest:
+            findings.append(
+                "ERROR: docs/agent-memory/HARVEST.md does not point at ./ringer.py scorecard"
+            )
+    if scorecard is not None:
+        for needle, reason in (
+            ("sot_drift", "axis id sot_drift"),
+            ("agent_memory_freshness", "axis id agent_memory_freshness"),
+            ("./ringer.py scorecard", "the scorecard command"),
+            ("soft-ship", "the soft-ship block"),
+        ):
+            if needle not in scorecard:
+                findings.append(f"ERROR: docs/SCORECARD.md is missing {reason}")
+        if "mark done" not in scorecard:
+            findings.append("ERROR: docs/SCORECARD.md does not block marking done")
+    for relative, text in texts.items():
+        findings.extend(_box_masquerade_findings(text, relative))
+        findings.extend(
+            _stamp_bar_findings(
+                text,
+                relative,
+                required=relative in {_SCORECARD_RECEIPTS, _SCORECARD_HARVEST},
+            )
+        )
+        findings.extend(
+            _exactly_enum_findings(
+                text,
+                relative,
+                required=relative == _SCORECARD_HARVEST,
+            )
+        )
+    index_path = _scorecard_repo_file(root, _SCORECARD_INDEX)
+    if index_path is None or not index_path.is_file():
+        findings.append(
+            "ERROR: docs/agent-memory/INDEX.json is missing; "
+            "receipt pointers cannot be checked"
+        )
+        return findings
+    try:
+        loaded = json.loads(index_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        findings.append(f"ERROR: docs/agent-memory/INDEX.json is not JSON ({exc.msg})")
+        return findings
+    except (OSError, UnicodeError) as exc:
+        findings.append(f"ERROR: cannot read docs/agent-memory/INDEX.json: {exc}")
+        return findings
+    if not isinstance(loaded, dict):
+        findings.append("ERROR: docs/agent-memory/INDEX.json must be a JSON object")
+        return findings
+    findings.extend(_index_pointer_findings(root, loaded))
+    return findings
+
+
+def check_agent_memory_freshness(
+    repo: Path,
+    *,
+    today: date,
+    max_age_days: int,
+) -> list[str]:
+    """ERROR findings when the harvest index is stale, missing, or hashed wrong."""
+    if max_age_days < 0:
+        return ["ERROR: max age days must be >= 0"]
+    root = repo.expanduser()
+    if not root.is_dir():
+        return [f"ERROR: repo root is not a directory: {root}"]
+    index_path = _scorecard_repo_file(root, _SCORECARD_INDEX)
+    if index_path is None or not index_path.is_file():
+        return ["ERROR: docs/agent-memory/INDEX.json is missing"]
+    try:
+        loaded = json.loads(index_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return [f"ERROR: docs/agent-memory/INDEX.json is not JSON ({exc.msg})"]
+    except (OSError, UnicodeError) as exc:
+        return [f"ERROR: cannot read docs/agent-memory/INDEX.json: {exc}"]
+    if not isinstance(loaded, dict):
+        return ["ERROR: docs/agent-memory/INDEX.json must be a JSON object"]
+    findings: list[str] = []
+    raw_date = loaded.get("harvested_on", None)
+    if raw_date is None:
+        findings.append("ERROR: harvested_on is missing")
+    elif not isinstance(raw_date, str) or re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw_date) is None:
+        findings.append(f"ERROR: harvested_on is not YYYY-MM-DD (got {raw_date!r})")
+    else:
+        try:
+            harvested = datetime.strptime(raw_date, "%Y-%m-%d").date()
+        except ValueError:
+            findings.append(f"ERROR: harvested_on is not a real date (got {raw_date!r})")
+        else:
+            if harvested > today:
+                findings.append(
+                    f"ERROR: harvested_on {raw_date} is after today {today.isoformat()}"
+                )
+            else:
+                age = (today - harvested).days
+                if age > max_age_days:
+                    findings.append(
+                        f"ERROR: harvested_on {raw_date} is {age} days old "
+                        f"(bar is {max_age_days})"
+                    )
+    docs = loaded.get("docs")
+    if not isinstance(docs, list):
+        findings.append("ERROR: docs[] is missing")
+        return findings
+    for index_i, entry in enumerate(docs):
+        if not isinstance(entry, dict):
+            findings.append(f"ERROR: docs[{index_i}] is not an object")
+            continue
+        relative = entry.get("path")
+        if not isinstance(relative, str) or not relative.strip():
+            findings.append(f"ERROR: docs[{index_i}].path is missing")
+            continue
+        path = _scorecard_repo_file(root, relative)
+        if path is None:
+            findings.append(f"ERROR: listed doc escapes the repo: {relative}")
+            continue
+        if not path.is_file():
+            findings.append(f"ERROR: listed doc missing: {relative}")
+            continue
+        if "sha256" not in entry or entry.get("sha256") is None:
+            continue
+        digest = entry.get("sha256")
+        if not isinstance(digest, str) or re.fullmatch(r"[0-9a-fA-F]{64}", digest) is None:
+            findings.append(f"ERROR: docs[{index_i}].sha256 is not 64 hex digits ({relative})")
+            continue
+        actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        if actual.lower() != digest.lower():
+            findings.append(f"ERROR: sha256 mismatch for {relative}")
+    return findings
+
+
+def resolve_scorecard_today(value: str | None) -> tuple[date | None, str | None]:
+    """UTC today, or --today. An invalid override does not fall through."""
+    if value is None:
+        return datetime.now(timezone.utc).date(), None
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) is None:
+        return None, f"ERROR: --today must be YYYY-MM-DD (got {value!r})"
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date(), None
+    except ValueError:
+        return None, f"ERROR: --today is not a real date (got {value!r})"
+
+
+def resolve_scorecard_max_age_days(cli_value: int | None) -> tuple[int | None, str | None]:
+    """Flag, else RINGER_SCORECARD_MAX_AGE_DAYS, else 7. Bad overrides fail closed."""
+    if cli_value is not None:
+        if cli_value < 0:
+            return None, "ERROR: --max-age-days must be >= 0"
+        return cli_value, None
+    raw = os.environ.get(SCORECARD_MAX_AGE_ENV)
+    if raw is None:
+        return SCORECARD_DEFAULT_MAX_AGE_DAYS, None
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return None, (
+            f"ERROR: {SCORECARD_MAX_AGE_ENV} must be an integer >= 0 (got {raw!r})"
+        )
+    if parsed < 0:
+        return None, f"ERROR: {SCORECARD_MAX_AGE_ENV} must be >= 0 (got {raw!r})"
+    return parsed, None
+
+
+def _scorecard_axis(axis_id: str, findings: list[str]) -> dict[str, Any]:
+    failed = any(item.startswith("ERROR") for item in findings)
+    return {"id": axis_id, "status": "fail" if failed else "pass", "findings": findings}
+
+
+def scorecard_report(repo: Path, *, today: date, max_age_days: int) -> dict[str, Any]:
+    """Both axes. ok is true only when every axis passed."""
+    axes = [
+        _scorecard_axis(SCORECARD_AXIS_SOT_DRIFT, check_sot_drift(repo)),
+        _scorecard_axis(
+            SCORECARD_AXIS_AGENT_MEMORY_FRESHNESS,
+            check_agent_memory_freshness(repo, today=today, max_age_days=max_age_days),
+        ),
+    ]
+    return {"axes": axes, "ok": all(axis["status"] == "pass" for axis in axes)}
+
+
+def format_scorecard(report: dict[str, Any]) -> str:
+    lines: list[str] = []
+    for axis in report["axes"]:
+        label = "PASS" if axis["status"] == "pass" else "FAIL"
+        lines.append(f"scorecard: {axis['id']} {label}")
+        for finding in axis["findings"]:
+            lines.append(f"scorecard: {axis['id']}: {finding}")
+    lines.append("scorecard: PASS" if report["ok"] else "scorecard: FAIL")
+    return "\n".join(lines)
+
+
+def run_scorecard_command(args: argparse.Namespace) -> int:
+    repo = (
+        args.repo.expanduser()
+        if getattr(args, "repo", None) is not None
+        else Path(__file__).resolve().parent
+    )
+    today, today_error = resolve_scorecard_today(getattr(args, "today", None))
+    max_age, age_error = resolve_scorecard_max_age_days(getattr(args, "max_age_days", None))
+    if today is None or max_age is None:
+        fresh = [item for item in (today_error, age_error) if item]
+        axes = [
+            _scorecard_axis(SCORECARD_AXIS_SOT_DRIFT, check_sot_drift(repo)),
+            _scorecard_axis(SCORECARD_AXIS_AGENT_MEMORY_FRESHNESS, fresh),
+        ]
+        report = {"axes": axes, "ok": all(axis["status"] == "pass" for axis in axes)}
+    else:
+        report = scorecard_report(repo, today=today, max_age_days=max_age)
+    if getattr(args, "json", False):
+        print(json.dumps(report, indent=2))
+    else:
+        print(format_scorecard(report))
+    return 0 if report["ok"] else 1
+
+
 def run_check_receipts_command(config: AppConfig, args: argparse.Namespace) -> int:
     state_dir = (
         args.state_dir.expanduser()
@@ -11200,6 +11682,35 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="treat a missing which_host as an error (new-write gate; default grandfathers it)",
     )
+
+    scorecard_parser = subparsers.add_parser(
+        "scorecard",
+        help="fail-closed weekly gate for sot_drift and agent_memory_freshness",
+    )
+    scorecard_parser.add_argument("--config", type=Path, default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+    scorecard_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="print {axes:[{id,status,findings}], ok} and nothing else",
+    )
+    scorecard_parser.add_argument(
+        "--max-age-days",
+        type=int,
+        default=None,
+        help=(
+            "freshness bar; harvested_on older than this many days fails "
+            f"(default {SCORECARD_DEFAULT_MAX_AGE_DAYS}, else {SCORECARD_MAX_AGE_ENV})"
+        ),
+    )
+    scorecard_parser.add_argument(
+        "--today",
+        help="UTC date YYYY-MM-DD used as the freshness clock (default: today)",
+    )
+    scorecard_parser.add_argument(
+        "--repo",
+        type=Path,
+        help="tree to read (default: the directory that contains ringer.py)",
+    )
     return parser
 
 
@@ -11263,6 +11774,8 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "catalog":
             return run_catalog_command(args)
+        if args.command == "scorecard":
+            return run_scorecard_command(args)
 
         config = AppConfig.load(args.config)
         if args.command == "db":

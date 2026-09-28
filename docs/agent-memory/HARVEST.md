@@ -138,3 +138,9 @@ Vault and skill source of truth is the fleet-information-unification skill and `
 Fleet source-of-truth map: Multica assigns · Open Engine protocol · Kata closes · Hermes executes · Ringer receipts · prover proves · Vault narrative · Dune constraints.
 
 On that map, Ringer stays the receipts plane. A harvest read still does not write those files.
+
+## Weekly scorecard
+
+Before a Multica card is marked done, and before a soft-ship, run `./ringer.py scorecard`. Exit 0 is required. A failure on `sot_drift` or `agent_memory_freshness` blocks done and soft-ship. Bars and flags: [`docs/SCORECARD.md`](../SCORECARD.md). The command does not rewrite this harvest.
+
+`which_host` stays the locked enum in [`docs/RECEIPTS.md`](../RECEIPTS.md): exactly `aegis`, `talaris`, or `box`. `box` stays scratch.

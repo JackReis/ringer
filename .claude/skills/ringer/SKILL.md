@@ -322,7 +322,8 @@ someone's untracked scratch files.
    and `which_host` (`aegis`, `talaris`, or `box`). Before Multica done or
    Kata close, the comment cites `runs/<run_id>` plus `which_host`.
    Host-craft receipts cite registered-machine Shell; a `box` receipt stays
-   Scratch in the stamp. See `docs/RECEIPTS.md`.
+   Scratch in the stamp. See `docs/RECEIPTS.md`. Do not mark Multica done
+   when `./ringer.py scorecard` fails. See `docs/SCORECARD.md`.
 2. For any retried or failed task, read the raw worker log in
    `<workdir>/logs/` before deciding anything. Retries that passed on
    attempt 2 often reveal a spec ambiguity worth fixing in your next
