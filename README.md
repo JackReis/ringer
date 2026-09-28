@@ -92,6 +92,8 @@ Each task gets its own directory, its own worker, its own log, and its own verdi
 
 **Which host**: every new run snapshot under `~/.ringer/runs/<run_id>.json` includes `which_host`, exactly `aegis`, `talaris`, or `box`. Missing, empty, aliases, and hostname strings fail the run before a receipt is written. A Multica comment before done cites `runs/<run_id>` and `which_host` (optional prover tip). Host-craft receipts (`aegis`, `talaris`) cite registered-machine Shell; `box` stays Scratch in the stamp. Contract: [`docs/RECEIPTS.md`](docs/RECEIPTS.md).
 
+**Scorecard**: `./ringer.py scorecard` is the weekly fail-closed gate for source-of-truth drift (`sot_drift`) and agent-memory freshness (`agent_memory_freshness`). Exit 0 is required before Multica done or soft-ship. Contract: [`docs/SCORECARD.md`](docs/SCORECARD.md).
+
 ### Manifest fields
 
 | Field | What it does |

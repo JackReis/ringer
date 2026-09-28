@@ -1,6 +1,6 @@
 {
   "schema": "ringer.agent-memory.harvest/v1",
-  "harvested_on": "2026-09-27",
+  "harvested_on": "2026-09-28",
   "repo": "ringer",
   "placement": {
     "loop": "open-engine / multica",
@@ -25,6 +25,10 @@
     {
       "path": "docs/RECEIPTS.md",
       "answers": "which_host enum, fail-closed new writes, Multica stamp bar, and grandfathered historical snapshots."
+    },
+    {
+      "path": "docs/SCORECARD.md",
+      "answers": "Weekly fail-closed scorecard: sot_drift and agent_memory_freshness bars, exit codes, and the Multica soft-ship block."
     }
   ],
   "state_root": {
@@ -220,7 +224,8 @@
       "Prefer Cursor cloud for harvest/draft/review.",
       "Trust rotation: Claude Code → ChatGPT/Codex → Gemini (Antigravity) → Kimi.",
       "Soft ship: draft → review → Multica stamp → apply (profile-mutate way-of-work).",
-      "CoS may soft-ship after stamp; Jack-gated: --replace, secrets, spend, irreversible."
+      "CoS may soft-ship after stamp; Jack-gated: --replace, secrets, spend, irreversible.",
+      "Do not mark done or soft-ship when ./ringer.py scorecard fails."
     ],
     "fleet_sot_map": "Multica assigns · Open Engine protocol · Kata closes · Hermes executes · Ringer receipts · prover proves · Vault narrative · Dune constraints."
   },
@@ -234,6 +239,8 @@
     "ringer.py PersistentHudServer",
     "docs/TAXONOMY.md",
     "docs/STEERING.md",
+    "docs/RECEIPTS.md",
+    "docs/SCORECARD.md",
     ".claude/skills/ringer/SKILL.md"
   ]
 }

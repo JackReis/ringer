@@ -84,3 +84,9 @@ A bad pin exits 2 and leaves no new file under `runs/`:
 ```
 
 Expect stderr to contain `which_host must be exactly one of: aegis, talaris, box` and `got 'hostname'`. Confirm `~/.ringer/runs/` gained no snapshot for that attempt.
+
+## Weekly scorecard
+
+Soft-ship and Multica close are fail-closed on a second gate. Do not mark done, and do not soft-ship, when `./ringer.py scorecard` fails. The command checks `sot_drift` and `agent_memory_freshness`. Bars, exit codes, and the JSON shape are in [`docs/SCORECARD.md`](SCORECARD.md).
+
+`check-receipts` still only lints run snapshots. A clean `check-receipts` line does not replace the scorecard. The scorecard prints findings. It does not rewrite receipts, `docs/agent-memory/INDEX.json`, or this file.

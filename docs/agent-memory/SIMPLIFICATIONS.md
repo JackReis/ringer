@@ -8,7 +8,7 @@ The receipt files are complete on purpose: raw logs, full specs, HTML pages, a d
 2. **Did the check pass?** Task `verdict == "PASS"` and `check_returncode == 0`. Library `pass` means every task passed. `ask` passing means the answer file was non-empty.
 3. **Who earned the lane?** `first_try_pass_rate` for this machine, this `task_type`, from `./ringer.py models --json`. Median tokens and duration are the cost. `docs/MODEL-NOTES.md` is the one-line judgment.
 
-Anything that does not serve those three stays on disk. The Multica comment before done still cites `runs/<run_id>` and `which_host` from the snapshot. That pin is not a fourth routing question. It stops the card from being read as a different host. See `docs/RECEIPTS.md`.
+Anything that does not serve those three stays on disk. The Multica comment before done still cites `runs/<run_id>` and `which_host` from the snapshot. That pin is not a fourth routing question. It stops the card from being read as a different host. See `docs/RECEIPTS.md`. Done and soft-ship also require `./ringer.py scorecard` to pass. See `docs/SCORECARD.md`.
 
 ## Collapse the words
 
