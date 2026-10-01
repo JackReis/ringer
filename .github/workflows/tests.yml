@@ -21,11 +21,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        if: runner.os == 'Linux'
+        with:
+          node-version: "22"
       - name: Install Linux sandbox test dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y bubblewrap nodejs
+          sudo apt-get install -y bubblewrap
+          # The sealed wrapper mounts Node plus its ELF libraries, not distro
+          # JS packages in /usr/share/nodejs. Use the upstream standalone binary.
+          sudo install -m 755 "$(command -v node)" /usr/bin/node
           # GitHub's disposable Ubuntu runner restricts unprivileged user
           # namespaces through AppArmor. Enable them for real sandbox tests.
           if sysctl kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then

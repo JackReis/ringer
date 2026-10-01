@@ -212,7 +212,7 @@ else {
             with self.subTest(model=model):
                 self.write_model_cache(model.removeprefix("openrouter/"))
                 result = self.run_wrapper(model)
-                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
                 invocation = json.loads((self.taskdir / "invocation.json").read_text())
                 self.assertEqual("/workspace", invocation["cwd"])
                 self.assertEqual(
@@ -328,7 +328,7 @@ else {
             encoding="utf-8",
         )
         result = self.run_wrapper(DEFAULT_MODEL)
-        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         invocation = json.loads((self.taskdir / "invocation.json").read_text())
         self.assertEqual(["models.json"], invocation["visible_agent_files"])
         model = invocation["models_config"]["providers"]["openrouter"]["models"][0]
@@ -488,7 +488,7 @@ else {
                 result = self.run_wrapper(
                     DEFAULT_MODEL, auth_dir=auth_dir, taskdir=taskdir
                 )
-                self.assertEqual(64, result.returncode, result.stderr)
+                self.assertEqual(64, result.returncode, result.stdout + result.stderr)
                 self.assertIn("overlaps Pi agent", result.stderr)
                 self.assertFalse((taskdir / "invocation.json").exists())
                 self.assertNotIn(FAKE_KEY, result.stdout + result.stderr)
@@ -653,7 +653,7 @@ else {
 
     def test_nonzero_child_status_propagates_through_supervisor(self) -> None:
         result = self.run_wrapper(DEFAULT_MODEL, "exit-23")
-        self.assertEqual(23, result.returncode, result.stderr)
+        self.assertEqual(23, result.returncode, result.stdout + result.stderr)
         self.assertNotIn(FAKE_KEY, result.stdout + result.stderr)
         self.assertNotIn("RINGER_PI_IDENTITY", result.stdout)
         self.assertEqual([], list(self.root.glob("pi-openrouter-ringer.*")))
@@ -683,7 +683,7 @@ else {
 
     def test_bash_syntax(self) -> None:
         result = subprocess.run(["bash", "-n", str(WRAPPER)], capture_output=True, text=True)
-        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 
 if __name__ == "__main__":
