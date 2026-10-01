@@ -8385,7 +8385,7 @@ class RingerRunner:
                 await self._record_prepare_error(runtime, prepare_error or "taskdir preparation failed")
                 return
             current_spec = runtime.task.spec
-            max_attempts = 2
+            max_attempts = 1 if runtime.task.engine in {"cursor-local", "cursor-cloud"} else 2
             for attempt in range(1, max_attempts + 1):
                 retrying = attempt > 1
                 with self.lock:
@@ -8696,6 +8696,16 @@ class RingerRunner:
         worker_env = dict(os.environ)
         if engine.env:
             worker_env.update(engine.env)
+        if runtime.task.engine in {"cursor-local", "cursor-cloud"}:
+            worker_env.update({
+                "RINGER_RUN_ID": self.run_id,
+                "RINGER_TASK_KEY": runtime.task.key,
+                "RINGER_ATTEMPT": str(attempt),
+                "RINGER_CURSOR_TIMEOUT_SECONDS": str(max(1, runtime.task.timeout_s - 30)),
+                "RINGER_CURSOR_STATE_DIR": str(
+                    self.config.state_dir.resolve() / "cursor" / self.run_id / runtime.task.key
+                ),
+            })
         async with AsyncFileCloser(log_fh):
             try:
                 proc = await asyncio.create_subprocess_exec(
@@ -8723,7 +8733,9 @@ class RingerRunner:
                 timed_out = True
                 terminate_process_group(proc)
                 try:
-                    await asyncio.wait_for(proc.wait(), timeout=5)
+                    await asyncio.wait_for(proc.wait(), timeout=(
+                        30 if runtime.task.engine in {"cursor-local", "cursor-cloud"} else 5
+                    ))
                 except asyncio.TimeoutError:
                     kill_process_group(proc)
                     await proc.wait()
@@ -9272,6 +9284,7 @@ def validate_auth_first_model_route(
         and engine_path.name in {
             "codex-oauth.sh", "claude-oauth.sh", "gemini-oauth.sh", "kimi-oauth.sh",
             "opencode-auth-policy.sh", "pi-openrouter-ringer.sh",
+            "cursor-local.sh", "cursor-cloud.sh",
         }
     )
     # Vanilla configs keep upstream behavior: the auth-first routing contract
@@ -9374,6 +9387,9 @@ def validate_auth_first_model_route(
                     "trusted engines/pi-openrouter-ringer.sh wrapper"
                 )
             continue
+        if engine_path in {trusted_dir / "cursor-local.sh", trusted_dir / "cursor-cloud.sh"}:
+            # Cursor validates account-visible model IDs; OpenRouter is rejected above.
+            continue
         family = restricted_model_family(model)
         if family is None:
             continue
@@ -9416,11 +9432,21 @@ def validate_manifest_engines(manifest: Manifest, config: AppConfig) -> None:
         and Path(candidate.bin).name in {
             "codex-oauth.sh", "claude-oauth.sh", "gemini-oauth.sh", "kimi-oauth.sh",
             "opencode-auth-policy.sh", "pi-openrouter-ringer.sh",
+            "cursor-local.sh", "cursor-cloud.sh",
         }
         for candidate in config.engines.values()
     )
     for task in manifest.tasks:
         engine = config.engines[task.engine]
+        if task.engine in {"cursor-local", "cursor-cloud"}:
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", task.key):
+                raise ValueError(f"task {task.key}: Cursor task key must be a plain safe identifier")
+            if Path(engine.bin).expanduser().resolve() != trusted_dir / f"{task.engine}.sh":
+                raise ValueError(f"task {task.key}: Cursor engines require their trusted wrapper")
+            if task.timeout_s <= 30:
+                raise ValueError(f"task {task.key}: Cursor timeout_s must exceed 30 seconds for cancellation")
+            if task.full_access:
+                raise ValueError(f"task {task.key}: Cursor engines do not support full_access")
         takes_model = engine_uses_model_placeholder(engine)
         if (engine.name == "codex" or Path(engine.bin).name == "codex") and (
             codex_config_override_is_malformed(task.engine_args)

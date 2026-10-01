@@ -143,3 +143,12 @@ source = "OpenRouter Video API manifest override, verified 2026-07-12"
 display = "Seedance 1.5 Pro"
 confidence = "verified"
 source = "OpenRouter Video API manifest override, verified 2026-07-12"
+
+# Harness/access metadata only. No account-visible model IDs are presumed verified.
+[engines.cursor-local]
+harness = "Cursor SDK local"
+access = "Cursor account"
+
+[engines.cursor-cloud]
+harness = "Cursor SDK cloud"
+access = "Cursor account"
