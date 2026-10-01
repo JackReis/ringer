@@ -234,3 +234,19 @@ enabled = true
 out = "~/.ringer/artifacts/{run_id}.html"
 report_out = "~/.ringer/artifacts/{run_id}-report.html"
 index_out = "~/.ringer/artifacts/index.html"
+
+# Optional independently installed cursor-execution-adapter (MIT).
+# Account-visible model IDs are discovered with the adapter; no default model.
+[engines.cursor-local]
+bin = "/absolute/path/to/ringer/engines/cursor-local.sh"
+args_template = ["{taskdir}", "{access_args}", "-m", "{model}", "{engine_args}", "--", "{spec}"]
+sandbox_args = []
+full_access_args = []
+auth_routing_trusted = true
+
+[engines.cursor-cloud]
+bin = "/absolute/path/to/ringer/engines/cursor-cloud.sh"
+args_template = ["{taskdir}", "{access_args}", "-m", "{model}", "{engine_args}", "--", "{spec}"]
+sandbox_args = []
+full_access_args = []
+auth_routing_trusted = true
