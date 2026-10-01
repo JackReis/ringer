@@ -8375,6 +8375,12 @@ class RingerRunner:
         for proc in procs:
             if proc.returncode is None:
                 kill_process_group(proc)
+        # Sending SIGKILL does not reap the child or finish its pipe transport.
+        # Keep the event loop alive until subprocess cleanup has completed.
+        if procs:
+            await asyncio.gather(*(proc.wait() for proc in procs))
+        for proc in procs:
+            self.active_processes.pop(proc.pid, None)
 
     async def _run_task(self, runtime: TaskRuntime) -> None:
         async with self.semaphore:
