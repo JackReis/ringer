@@ -51,6 +51,7 @@ class CursorTests(unittest.TestCase):
         self.assertEqual(identity.harness, 'Cursor SDK cloud')
         self.assertTrue(identity.unregistered)
 
+    @unittest.skipUnless(os.name == "posix", "Cursor shell-wrapper execution requires POSIX")
     def test_failed_worker_is_not_retried_and_receives_durable_state(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -82,6 +83,7 @@ auth_routing_trusted = true
             self.assertEqual(len(calls), 1)
             self.assertEqual(json.loads(calls[0])['RINGER_ATTEMPT'], '1')
 
+    @unittest.skipUnless(os.name == "posix", "Cursor shell-wrapper execution requires POSIX")
     def test_bridge_forwarding_and_validation(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

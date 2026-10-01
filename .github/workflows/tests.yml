@@ -21,16 +21,27 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install Linux sandbox test dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap nodejs
+          # GitHub's disposable Ubuntu runner restricts unprivileged user
+          # namespaces through AppArmor. Enable them for real sandbox tests.
+          if sysctl kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          /usr/bin/bwrap --unshare-user --unshare-pid --unshare-ipc --unshare-uts --unshare-cgroup --ro-bind / / /bin/true
       - name: Run test suite
         env:
           RINGER_NO_SELF_UPDATE: "1"
         run: python3 -m unittest discover -s tests -v
 
   windows:
-    # Non-blocking harness for native-Windows contributions (see PR #17).
-    # The suite is POSIX-only today; the job exists so Windows PRs carry
-    # executed proof on windows-latest. Flip to required once it's green.
-    name: windows harness (non-blocking)
+    # The full suite executes POSIX processes and is covered above. This
+    # native-Windows harness verifies portable Cursor routing/identity rules;
+    # shell-wrapper execution remains explicitly POSIX-only, not Windows proof.
+    name: windows Cursor contract (non-blocking)
     runs-on: windows-latest
     continue-on-error: true
     steps:
@@ -40,7 +51,7 @@ jobs:
           python-version: "3.12"
       - name: Compile
         run: python -m py_compile ringer.py
-      - name: Attempt test suite
+      - name: Test portable Cursor contract
         env:
           RINGER_NO_SELF_UPDATE: "1"
-        run: python -m unittest discover -s tests -v
+        run: python -m unittest discover -s tests -p test_cursor_engines.py -v
