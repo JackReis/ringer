@@ -7,6 +7,48 @@ to print the per-model, per-task_type scoreboard (tasks, attempts,
 pass_rate, first_try_pass_rate, median duration/tokens, last_seen). This
 file remains the judgment layer on top of those numbers.
 
+## Engine health markers
+
+Grep-able gates read by the Claude Code PreToolUse hook
+`~/.claude/hooks/ringer-engine-preflight.py` before every `ringer.py run`
+(`grep -nE '^\s*(- )?(QUARANTINE|BROKEN|CLEARED):' docs/MODEL-NOTES.md`).
+Markers can live anywhere in this file, but each must sit on its own line at
+the start of the line (a leading `- ` bullet is fine). Lines inside code fences
+are ignored. Format:
+
+- `QUARANTINE: <engine> [sandboxed|full_access|all] [model=<selector>] — <YYYY-MM-DD> — <evidence> — remediation: <fix>`
+  blocks tasks on `<engine>` (the `[engines.<name>]` key in config.toml, not
+  a model name). Scope `sandboxed` means tasks without `full_access`, and `all`
+  is the default. `model=` narrows the block to tasks whose effective model
+  (task `model` or the engine's `model_default`) matches.
+- `BROKEN: <engine> [scope] [model=...] — ...` is the same gate, for a hard
+  break asserted by a human.
+- `CLEARED: ...` is inert history. To lift a gate, fix the engine, rewrite
+  the prefix to `CLEARED:` (keep the line), delete that engine's entries in
+  `~/.ringer/engine-health.json`, and run once with
+  `RINGER_PREFLIGHT_ALLOW=<engine>` so a fresh pass is recorded.
+
+`~/.claude/hooks/ringer-run-learn.py` (PostToolUse) appends dated
+`QUARANTINE:` lines under `### <engine>` below. It does this automatically when
+at least 50% of an engine's tasks in a finished run fail fast with no output
+(tokens=0, under 15s per attempt, and a non-zero rc or a refusal/cancel signal
+such as grok's `stopReason: cancelled` JSON or a wrapper refusal line).
+
+### kimi
+
+- 2026-10-04 — kimi engine (`kimi-oauth.sh` wrapper), run
+  `agent-roster-trim-20261004T190714Z-p69475`, task `shorten-descriptions-b`:
+  both attempts died in 0.4s total with rc=64 and no model output. The
+  wrapper's stderr said `kimi-oauth.sh: blocked ambiguous or non-OAuth
+  invocation`. The OAuth credential file is present. The refusal comes from
+  the wrapper's `normalize_model`, which rejects the config's
+  `model_default = "kimi-for-coding/k3"`. Running that function in isolation
+  confirmed this: `kimi-for-coding/k3` is refused, while `k3` maps to
+  `kimi-code/k3` and `kimi-for-coding` maps to `kimi-code/kimi-for-coding`.
+  kimi's args_template has no `{access_args}`, so `full_access` does not
+  change the invocation and cannot fix it.
+- QUARANTINE: kimi all model=kimi-for-coding/k3 — 2026-10-04 — wrapper refuses the default model selector (rc=64 in <1s, no output) — remediation: set the task `"model": "k3"` (or `"kimi-for-coding"`), or align `engines.kimi.model_default` with the wrapper's allowlist, then clear this marker.
+
 ## qwen3.8:27b via pi-ollama-d (local Ollama 11435)
 
 - 2026-08-16 — probe, first-try PASS in 23.3s. Pi wrapper wrote `lane_probe.py` (`print("LOCAL_LANE_OK")`); executed check printed `LOCAL_LANE_OK`. Tokens uncounted. Earlier same-day Ollama generate on the 3090 returned exact `QWEN38_OK` at 100% GPU / ~21 GiB VRAM. One plumbing sample only; do not promote to default.
@@ -847,6 +889,8 @@ checks and raw logs support — no vibes, no worker self-reports.
   across 15 pages — ALL attempt 1 (player's red ledger entry was a check bug,
   artifact certified). Fast, precise on mechanical/code work. No token counts
   in JSON output (flat plan) — cost reads "included in plan".
+- 2026-10-04 — grok CLI 1.0.13 + `--sandbox workspace` (the engine's sandbox_args): every task exited in ~8s with JSON `stopReason: cancelled`, empty text, no stderr in json mode. Reproduced by hand: read-only/workspace-write/strict/danger-full-access all print 'could not apply the sandbox profile'; only `--sandbox off` runs. Workaround used: per-task `full_access: true` (grok then ran fine). Treat sandboxed grok as broken until the CLI or the engine block is fixed; also note a bare 'pong' prompt costs ~101k input tokens (grok loads a large fixed context), ~$0.07/call.
+- QUARANTINE: grok sandboxed — 2026-10-04 — grok CLI 1.0.13 cannot apply any sandbox profile except `off`; sandboxed tasks exit in about 4s per attempt with `stopReason: cancelled` and empty text (run agent-roster-trim-20261004T185949Z-p42748). The same job then passed 3/3 first try with `full_access: true` (runs 20261004T190714Z and 20261004T191220Z) — remediation: set `"full_access": true` on grok tasks (config has allow_full_access = true), or use another engine.
 
 ## grok-composer-2.5-fast (Grok CLI engine, flat plan)
 
