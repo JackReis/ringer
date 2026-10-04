@@ -47,7 +47,8 @@ such as grok's `stopReason: cancelled` JSON or a wrapper refusal line).
   `kimi-code/k3` and `kimi-for-coding` maps to `kimi-code/kimi-for-coding`.
   kimi's args_template has no `{access_args}`, so `full_access` does not
   change the invocation and cannot fix it.
-- QUARANTINE: kimi all model=kimi-for-coding/k3 — 2026-10-04 — wrapper refuses the default model selector (rc=64 in <1s, no output) — remediation: set the task `"model": "k3"` (or `"kimi-for-coding"`), or align `engines.kimi.model_default` with the wrapper's allowlist, then clear this marker.
+- CLEARED: kimi all model=kimi-for-coding/k3 — 2026-10-04 cleared: engines.kimi.model_default changed to `k3`; probe ringer-engine-repair-20261004T193927Z kimi-k3-probe PASS attempt 1 (27s, probe.txt token verified).
+  (was) QUARANTINE: kimi all model=kimi-for-coding/k3 — 2026-10-04 — wrapper refuses the default model selector (rc=64 in <1s, no output) — remediation: set the task `"model": "k3"` (or `"kimi-for-coding"`), or align `engines.kimi.model_default` with the wrapper's allowlist, then clear this marker.
 
 ## qwen3.8:27b via pi-ollama-d (local Ollama 11435)
 
