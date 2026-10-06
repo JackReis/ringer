@@ -49,6 +49,7 @@ class RingerCliTests(unittest.TestCase):
     def write_config(self, engines: dict[str, list[str]], *, port: int = 18787) -> None:
         lines = [
             f'state_dir = "{self.state_dir}"',
+            'which_host = "aegis"',
             f"dashboard_port_base = {port}",
             "allow_full_access = false",
             "",
@@ -246,6 +247,7 @@ class RingerCliTests(unittest.TestCase):
     def test_concurrent_state_flushes_use_independent_temp_files(self) -> None:
         writer = ringer.StateWriter(
             run_id="race",
+            which_host="aegis",
             run_name="race",
             identity="test-runner",
             state_dir=self.state_dir,

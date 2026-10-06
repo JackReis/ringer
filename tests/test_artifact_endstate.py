@@ -123,6 +123,7 @@ class ArtifactEndstateTests(unittest.TestCase):
             [runtime],
             threading.RLock(),
             artifact=artifact,
+            which_host="aegis",
         )
 
     def test_finished_writer_rewrites_all_final_pages_without_refresh(self) -> None:

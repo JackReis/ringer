@@ -102,6 +102,7 @@ class ArtifactLibraryTests(unittest.TestCase):
             runtimes if runtimes is not None else [self.runtime()],
             ringer.threading.RLock(),
             artifact=self.artifact,
+            which_host="aegis",
         )
 
     def library_entry(self, run_name: str = "Library Run") -> dict[str, object]:
