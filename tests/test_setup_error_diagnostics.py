@@ -89,6 +89,7 @@ class SetupErrorDiagnosticsTests(unittest.TestCase):
                         "enabled = false",
                         "",
                         "[engines.mock]",
+                        "auth_routing_trusted = true",
                         f"bin = {toml_string(sys.executable)}",
                         "args_template = [",
                         f"  {toml_string(ROOT / 'engines' / 'mock_worker.py')},",
