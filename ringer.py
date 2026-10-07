@@ -10098,7 +10098,7 @@ def validate_auth_first_model_route(
         engine_path.parent == trusted_dir
         and engine_path.name in {
             "codex-oauth.sh", "claude-oauth.sh", "gemini-oauth.sh", "kimi-oauth.sh",
-            "opencode-auth-policy.sh", "pi-openrouter-ringer.sh",
+            "agy-oauth.sh", "opencode-auth-policy.sh", "pi-openrouter-ringer.sh",
         }
     )
     # Vanilla configs keep upstream behavior: the auth-first routing contract
@@ -10168,11 +10168,14 @@ def validate_auth_first_model_route(
                 "provider/profile/backend/config/settings/agent/attach/endpoint override"
             )
 
-    expected_wrapper = {
-        "anthropic": "claude-oauth.sh",
-        "openai": "codex-oauth.sh",
-        "google": "gemini-oauth.sh",
-        "kimi": "kimi-oauth.sh",
+    # Primary subscription wrappers plus Antigravity (agy-oauth.sh), which is a
+    # separate consumer OAuth lane that can honestly serve anthropic/google/openai
+    # selectors without Claude Code / Codex / Gemini CLI logins.
+    expected_wrappers = {
+        "anthropic": frozenset({"claude-oauth.sh", "agy-oauth.sh"}),
+        "openai": frozenset({"codex-oauth.sh", "agy-oauth.sh"}),
+        "google": frozenset({"gemini-oauth.sh", "agy-oauth.sh"}),
+        "kimi": frozenset({"kimi-oauth.sh"}),
     }
     candidates: list[str] = []
     for candidate in (
@@ -10211,22 +10214,23 @@ def validate_auth_first_model_route(
                 and coding_plan_suffix
                 and "/" not in coding_plan_suffix
             ):
-                wrapper = "opencode-auth-policy.sh"
+                allowed_wrappers = frozenset({"opencode-auth-policy.sh"})
             else:
                 raise ValueError(
                     f"task {task.key}: restricted glm model {model!r} requires "
                     "the Z.AI Coding Plan selector zai-coding-plan/glm-*"
                 )
         else:
-            wrapper = expected_wrapper[family]
-        if engine_path != trusted_dir / wrapper:
+            allowed_wrappers = expected_wrappers[family]
+        if engine_path.parent != trusted_dir or engine_path.name not in allowed_wrappers:
+            allowed = ", ".join(sorted(allowed_wrappers))
             raise ValueError(
                 f"task {task.key}: restricted {family} model {model!r} requires "
-                f"the trusted engines/{wrapper} wrapper"
+                f"a trusted engines/ wrapper ({allowed})"
             )
     if enforce_generic_controls and not trusted_wrapper and engine_path.name.lower() in {
         "opencode", "opencode.exe", "claude", "claude.exe", "codex", "codex.exe",
-        "kimi", "kimi.exe", "kimi-code", "kimi-code.exe"
+        "kimi", "kimi.exe", "kimi-code", "kimi-code.exe", "agy", "agy.exe",
     }:
         raise ValueError(
             f"task {task.key}: direct model harness {engine_path.name!r} requires its trusted auth-policy wrapper"
@@ -10242,7 +10246,7 @@ def validate_manifest_engines(manifest: Manifest, config: AppConfig) -> None:
         Path(candidate.bin).expanduser().resolve().parent == trusted_dir
         and Path(candidate.bin).name in {
             "codex-oauth.sh", "claude-oauth.sh", "gemini-oauth.sh", "kimi-oauth.sh",
-            "opencode-auth-policy.sh", "pi-openrouter-ringer.sh",
+            "agy-oauth.sh", "opencode-auth-policy.sh", "pi-openrouter-ringer.sh",
         }
         for candidate in config.engines.values()
     )

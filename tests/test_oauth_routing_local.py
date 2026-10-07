@@ -343,5 +343,53 @@ class AuthFirstRoutingLocalTests(unittest.TestCase):
         ringer.validate_manifest_engines(self.manifest("kimi-api"), config)
 
 
+
+    def test_agy_oauth_wrapper_accepts_restricted_families(self) -> None:
+        agy = ringer.EngineConfig(
+            name="agy",
+            bin=str(ENGINES / "agy-oauth.sh"),
+            args_template=("--model", "{model}", "{engine_args}", "--prompt", "{spec}"),
+            sandbox_args=(),
+            full_access_args=(),
+            token_regex=None,
+            model_default="claude-sonnet-4-6",
+        )
+        config = SimpleNamespace(engines={"agy": agy, "codex": ringer.built_in_codex_engine()})
+        for model in ("claude-sonnet-4-6", "gemini-3.1-pro-high", "gpt-oss-120b-medium"):
+            with self.subTest(model=model):
+                ringer.validate_manifest_engines(self.manifest("agy", model), config)
+
+    def test_agy_oauth_wrapper_still_rejects_kimi_and_openrouter(self) -> None:
+        agy = ringer.EngineConfig(
+            name="agy",
+            bin=str(ENGINES / "agy-oauth.sh"),
+            args_template=("--model", "{model}", "--prompt", "{spec}"),
+            sandbox_args=(),
+            full_access_args=(),
+            token_regex=None,
+        )
+        config = SimpleNamespace(engines={"agy": agy, "codex": ringer.built_in_codex_engine()})
+        with self.assertRaisesRegex(ValueError, "restricted kimi"):
+            ringer.validate_manifest_engines(self.manifest("agy", "kimi-k3"), config)
+        with self.assertRaisesRegex(ValueError, "pi-openrouter-ringer.sh"):
+            ringer.validate_manifest_engines(
+                self.manifest("agy", "openrouter/anthropic/claude-sonnet-4"), config
+            )
+
+    def test_raw_agy_harness_is_rejected_when_auth_routing_enabled(self) -> None:
+        raw = ringer.EngineConfig(
+            name="agy",
+            bin="/Users/hermes/.local/bin/agy",
+            args_template=("--model", "{model}", "--prompt", "{spec}"),
+            sandbox_args=(),
+            full_access_args=(),
+            token_regex=None,
+            auth_routing_trusted=True,
+            model_default="claude-sonnet-4-6",
+        )
+        config = SimpleNamespace(engines={"agy": raw, "codex": ringer.built_in_codex_engine()})
+        with self.assertRaisesRegex(ValueError, r"trusted engines/ wrapper \(agy-oauth\.sh, claude-oauth\.sh\)"):
+            ringer.validate_manifest_engines(self.manifest("agy"), config)
+
 if __name__ == "__main__":
     unittest.main()

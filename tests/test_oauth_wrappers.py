@@ -713,7 +713,7 @@ class TestOutputSafetyTests(WrapperTestCase):
 
 class HostBashSyntaxSmokeTests(unittest.TestCase):
     def test_wrappers_parse_with_host_bash_and_avoid_lowercase_expansion(self) -> None:
-        for name in ("claude-oauth.sh", "codex-oauth.sh", "opencode-auth-policy.sh"):
+        for name in ("claude-oauth.sh", "codex-oauth.sh", "agy-oauth.sh", "opencode-auth-policy.sh"):
             text = (ENGINES / name).read_text(encoding="utf-8")
             with self.subTest(name=name):
                 self.assertNotIn(",,}", text)
