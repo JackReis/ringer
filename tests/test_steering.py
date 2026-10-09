@@ -707,6 +707,7 @@ class SteeringMockEngineFunctionalTests(unittest.TestCase):
                         "enabled = false",
                         "",
                         "[engines.mock]",
+                        "auth_routing_trusted = true",
                         f"bin = {toml_string(sys.executable)}",
                         'model_default = "mock/model"',
                         "args_template = [",
